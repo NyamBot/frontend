@@ -119,13 +119,6 @@ h1 {
   font-weight: 700;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: minmax(340px, 0.95fr) minmax(280px, 0.72fr) minmax(380px, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
 .taste-grid {
   display: grid;
   grid-template-columns: minmax(360px, 0.9fr) minmax(360px, 0.9fr) minmax(420px, 1.1fr);
@@ -173,6 +166,12 @@ h1 {
   cursor: pointer;
 }
 
+.sample-row .sample-save-button {
+  border-color: #185c55;
+  color: #fff;
+  background: #185c55;
+}
+
 label {
   display: grid;
   gap: 6px;
@@ -201,12 +200,6 @@ textarea {
 
 .question-box {
   min-height: 150px;
-}
-
-.user-box {
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #dedbd2;
 }
 
 .place-search {
@@ -250,40 +243,6 @@ textarea {
   font-size: 12px;
 }
 
-.user-actions,
-.chat-input {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  align-items: center;
-}
-
-.user-actions button,
-.chat-input button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 42px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 8px;
-  color: #fff;
-  background: #185c55;
-  cursor: pointer;
-}
-
-.chat-input button {
-  width: 42px;
-  padding: 0;
-}
-
-.chat-input button:disabled,
-.user-actions button:disabled {
-  opacity: 0.6;
-  cursor: wait;
-}
-
 .wide-button {
   display: inline-flex;
   width: 100%;
@@ -316,11 +275,6 @@ textarea {
   gap: 12px;
 }
 
-.idea-list {
-  display: grid;
-  gap: 10px;
-}
-
 .restaurant-list {
   display: grid;
   gap: 10px;
@@ -328,8 +282,7 @@ textarea {
   overflow-y: auto;
 }
 
-.restaurant-card,
-.idea-card {
+.restaurant-card {
   display: grid;
   gap: 8px;
   width: 100%;
@@ -341,21 +294,18 @@ textarea {
   cursor: pointer;
 }
 
-.restaurant-card.selected,
-.idea-card.selected {
+.restaurant-card.selected {
   border-color: #185c55;
   background: #eef8f5;
 }
 
-.restaurant-card span,
-.idea-card span {
+.restaurant-card span {
   color: #525252;
   font-size: 14px;
   line-height: 1.45;
 }
 
-.restaurant-card small,
-.idea-card small {
+.restaurant-card small {
   color: #806d32;
   font-weight: 700;
 }
@@ -378,23 +328,6 @@ textarea {
   cursor: wait;
 }
 
-.script-content h3 {
-  margin: 0 0 16px;
-  font-size: 22px;
-  line-height: 1.18;
-}
-
-.pack-count {
-  margin: -6px 0 12px;
-  color: #806d32;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.agent-panel {
-  grid-column: 2 / 4;
-}
-
 .history-panel {
   grid-column: 2 / 4;
 }
@@ -406,6 +339,21 @@ textarea {
 .recommendation-list {
   display: grid;
   gap: 12px;
+}
+
+.answer-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #b9d9cf;
+  border-radius: 8px;
+  background: #eef8f5;
+}
+
+.answer-card p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.55;
 }
 
 .recommendation-card {
@@ -482,49 +430,6 @@ textarea {
   font-weight: 700;
 }
 
-.section {
-  margin-top: 18px;
-}
-
-.section h4 {
-  margin: 0 0 8px;
-  font-size: 13px;
-  text-transform: uppercase;
-  color: #6f5d2f;
-}
-
-ul {
-  margin: 0;
-  padding-left: 20px;
-}
-
-li {
-  margin: 7px 0;
-  line-height: 1.45;
-}
-
-.audio-block {
-  margin-top: 20px;
-  padding-top: 18px;
-  border-top: 1px solid #dedbd2;
-}
-
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 18px;
-}
-
-.tags span {
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #f0ead7;
-  color: #5d4b18;
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .empty {
   margin: 0;
   color: #777;
@@ -540,16 +445,8 @@ li {
     position: static;
   }
 
-  .grid {
-    grid-template-columns: 1fr;
-  }
-
   .taste-grid {
     grid-template-columns: 1fr;
-  }
-
-  .agent-panel {
-    grid-column: auto;
   }
 
   .history-panel {
