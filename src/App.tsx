@@ -1,13 +1,16 @@
-import { MapPin, MessageSquare, Plus, RefreshCw, Search, Sparkles, Store, Utensils } from "lucide-react";
+import { LogIn, LogOut, MapPin, MessageSquare, Plus, RefreshCw, Search, Sparkles, Store, Utensils } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
+  KAKAO_LOGIN_URL,
   KakaoPlace,
   Restaurant,
   RestaurantRecommendation,
   TasteAgentMessage,
+  User,
   addRestaurantNote,
   chatTasteAgent,
   createRestaurant,
+  getCurrentUser,
   listRestaurants,
   listTasteAgentMessages,
   searchKakaoPlaces,
@@ -37,6 +40,8 @@ const sampleRestaurants = [
 ];
 
 export function App() {
+  const [token, setToken] = useState(() => localStorage.getItem("tasteforge_token") ?? "");
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [messages, setMessages] = useState<TasteAgentMessage[]>([]);
   const [recommendations, setRecommendations] = useState<RestaurantRecommendation[]>([]);
@@ -62,21 +67,68 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void refresh();
+    const params = new URLSearchParams(window.location.search);
+    const callbackToken = params.get("token");
+    const authError = params.get("auth_error");
+    if (callbackToken) {
+      localStorage.setItem("tasteforge_token", callbackToken);
+      setToken(callbackToken);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      return;
+    }
+    if (authError) {
+      setError(`카카오 로그인 실패: ${authError}`);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
   }, []);
 
-  async function refresh() {
+  useEffect(() => {
+    if (!token) {
+      setCurrentUser(null);
+      setRestaurants([]);
+      setMessages([]);
+      setRecommendations([]);
+      setAssistantAnswer("");
+      return;
+    }
+    void loadSession(token);
+  }, [token]);
+
+  async function loadSession(activeToken: string) {
+    try {
+      const user = await getCurrentUser(activeToken);
+      setCurrentUser(user);
+      await refresh(activeToken);
+    } catch (caught) {
+      localStorage.removeItem("tasteforge_token");
+      setToken("");
+      setError(caught instanceof Error ? caught.message : "로그인이 만료되었습니다.");
+    }
+  }
+
+  async function refresh(activeToken = token) {
+    if (!activeToken) return;
     try {
       const [restaurantList, messageList] = await Promise.all([
-        listRestaurants(),
-        listTasteAgentMessages(),
+        listRestaurants(activeToken),
+        listTasteAgentMessages(activeToken),
       ]);
       setRestaurants(restaurantList);
       setMessages(messageList.messages);
-    } catch {
+    } catch (caught) {
       setRestaurants([]);
       setMessages([]);
+      setError(caught instanceof Error ? caught.message : "저장된 데이터를 불러오지 못했습니다.");
     }
+  }
+
+  function handleLogin() {
+    window.location.href = KAKAO_LOGIN_URL;
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("tasteforge_token");
+    setToken("");
   }
 
   function loadSample(index: number) {
@@ -91,6 +143,10 @@ export function App() {
   }
 
   async function handleSaveRestaurant() {
+    if (!token) {
+      setError("로그인 후 맛집 메모를 저장할 수 있습니다.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -98,7 +154,7 @@ export function App() {
         await addRestaurantNote(selectedRestaurantId, {
           content: note,
           tags: splitCsv(moodTags),
-        });
+        }, token);
         await refresh();
         return;
       }
@@ -115,7 +171,7 @@ export function App() {
         address: selectedPlace?.address_name ?? null,
         road_address: selectedPlace?.road_address_name ?? null,
         phone: selectedPlace?.phone ?? null,
-      });
+      }, token);
       await refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "맛집 저장에 실패했습니다.");
@@ -125,6 +181,10 @@ export function App() {
   }
 
   async function handleSaveSamples() {
+    if (!token) {
+      setError("로그인 후 샘플 맛집을 저장할 수 있습니다.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -139,7 +199,7 @@ export function App() {
             signature_menus: sample.signature_menus,
             note: sample.note,
             kakao_place_url: sample.kakao_place_url,
-          }),
+          }, token),
         ),
       );
       await refresh();
@@ -195,6 +255,10 @@ export function App() {
   }
 
   async function handleAsk() {
+    if (!token) {
+      setError("로그인 후 저장된 맛집 메모 기반 추천을 받을 수 있습니다.");
+      return;
+    }
     if (!query.trim()) return;
     setLoading(true);
     setError(null);
@@ -206,7 +270,7 @@ export function App() {
         cuisine: cuisine || null,
         tags: splitCsv(tags),
         limit: 3,
-      });
+      }, token);
       setAssistantAnswer(response.answer);
       setRecommendations(response.recommendations);
       await refresh();
@@ -246,6 +310,30 @@ export function App() {
             {loading ? "추천 중..." : "맛집 추천"}
           </button>
         </header>
+        <section className="auth-bar">
+          {currentUser ? (
+            <div>
+              <strong>{currentUser.display_name}</strong>
+              <span>{currentUser.email}</span>
+            </div>
+          ) : (
+            <div>
+              <strong>로그인이 필요합니다</strong>
+              <span>카카오 로그인 후 내 맛집 메모와 채팅 기록이 분리 저장됩니다.</span>
+            </div>
+          )}
+          {currentUser ? (
+            <button type="button" onClick={handleLogout}>
+              <LogOut size={17} />
+              로그아웃
+            </button>
+          ) : (
+            <button type="button" onClick={handleLogin}>
+              <LogIn size={17} />
+              카카오 로그인
+            </button>
+          )}
+        </section>
         {error && <div className="error-banner">{error}</div>}
 
         <section className="taste-grid">
@@ -272,7 +360,7 @@ export function App() {
               분위기/상황 태그
               <input value={tags} onChange={(event) => setTags(event.target.value)} />
             </label>
-            <button className="wide-button" disabled={loading} onClick={handleAsk}>
+            <button className="wide-button" disabled={loading || !token} onClick={handleAsk}>
               <Search size={18} />
               {loading ? "저장된 메모 검색 중..." : "하이브리드 RAG 추천 받기"}
             </button>
@@ -318,7 +406,7 @@ export function App() {
                   샘플 {index + 1}
                 </button>
               ))}
-              <button className="sample-save-button" disabled={saving} type="button" onClick={handleSaveSamples}>
+              <button className="sample-save-button" disabled={saving || !token} type="button" onClick={handleSaveSamples}>
                 샘플 전체 저장
               </button>
             </div>
@@ -352,7 +440,7 @@ export function App() {
               방문 메모/리뷰
               <textarea value={note} onChange={(event) => setNote(event.target.value)} />
             </label>
-            <button className="wide-button" disabled={saving} onClick={handleSaveRestaurant}>
+            <button className="wide-button" disabled={saving || !token} onClick={handleSaveRestaurant}>
               <Store size={18} />
               {saving ? "저장 중..." : selectedRestaurantId ? "선택한 맛집에 메모 추가" : "맛집 메모 저장"}
             </button>
@@ -396,7 +484,7 @@ export function App() {
             <div className="panel-title">
               <MapPin size={18} />
               <h2>저장된 맛집</h2>
-              <button className="icon-button" type="button" onClick={refresh}>
+              <button className="icon-button" type="button" onClick={() => refresh()}>
                 <RefreshCw size={16} />
               </button>
             </div>

@@ -109,6 +109,44 @@ h1 {
   cursor: wait;
 }
 
+.auth-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid #dedbd2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.auth-bar strong,
+.auth-bar span {
+  display: block;
+}
+
+.auth-bar span {
+  margin-top: 3px;
+  color: #525252;
+  font-size: 13px;
+}
+
+.auth-bar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  white-space: nowrap;
+  background: #185c55;
+  cursor: pointer;
+}
+
 .error-banner {
   margin: 0 0 16px;
   padding: 12px 14px;
@@ -454,6 +492,10 @@ textarea {
   }
 
   .topbar {
+    display: grid;
+  }
+
+  .auth-bar {
     display: grid;
   }
 }
