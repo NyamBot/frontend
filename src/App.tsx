@@ -1,16 +1,32 @@
-import { FileText, Hash, MessageSquare, Music2, Send, Sparkles, UserPlus, Video } from "lucide-react";
+import {
+  Archive,
+  FileText,
+  Hash,
+  MessageSquare,
+  Music2,
+  RefreshCw,
+  Send,
+  Sparkles,
+  UserPlus,
+  Video,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   AgentMessage,
   ClipIdea,
   ScriptPack,
+  SourceDetail,
   User,
   chatAgent,
   createSource,
   createUser,
   generateIdeas,
   generateScript,
+  getSource,
   listAgentMessages,
+  listCampaignPacks,
+  listClipIdeas,
+  listSources,
   listUsers,
 } from "./api";
 
@@ -45,6 +61,9 @@ The workflow is simple: find the moment, write three hooks, choose one visual pa
   },
 ];
 
+const archivedTranscriptNote =
+  "이전 작업의 원본 전문은 벡터 검색용 청크로 저장되어 있습니다. 저장된 아이디어, 캠페인 팩, RAG 대화는 아래에서 다시 확인할 수 있습니다.";
+
 export function App() {
   const [title, setTitle] = useState(samples[0].title);
   const [audience, setAudience] = useState(samples[0].audience);
@@ -53,8 +72,10 @@ export function App() {
   const [goal, setGoal] = useState(samples[0].goal);
   const [transcript, setTranscript] = useState(samples[0].transcript);
   const [sourceId, setSourceId] = useState<string | null>(null);
+  const [sources, setSources] = useState<SourceDetail[]>([]);
   const [ideas, setIdeas] = useState<ClipIdea[]>([]);
   const [selectedIdea, setSelectedIdea] = useState<ClipIdea | null>(null);
+  const [packs, setPacks] = useState<ScriptPack[]>([]);
   const [script, setScript] = useState<ScriptPack | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -63,6 +84,7 @@ export function App() {
   const [agentInput, setAgentInput] = useState("이 소재로 첫 3초 후킹을 어떻게 잡을까?");
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sourcesLoading, setSourcesLoading] = useState(false);
   const [agentLoading, setAgentLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +97,30 @@ export function App() {
       .catch(() => setUsers([]));
   }, []);
 
+  useEffect(() => {
+    void refreshSources(selectedUserId);
+  }, [selectedUserId]);
+
+  async function refreshSources(userId = selectedUserId) {
+    setSourcesLoading(true);
+    try {
+      setSources(await listSources(userId));
+    } catch {
+      setSources([]);
+    } finally {
+      setSourcesLoading(false);
+    }
+  }
+
+  function resetWorkspace() {
+    setSourceId(null);
+    setIdeas([]);
+    setSelectedIdea(null);
+    setPacks([]);
+    setScript(null);
+    setAgentMessages([]);
+  }
+
   function loadSample(index: number) {
     const sample = samples[index];
     setTitle(sample.title);
@@ -83,11 +129,7 @@ export function App() {
     setTone(sample.tone);
     setGoal(sample.goal);
     setTranscript(sample.transcript);
-    setSourceId(null);
-    setIdeas([]);
-    setSelectedIdea(null);
-    setScript(null);
-    setAgentMessages([]);
+    resetWorkspace();
     setError(null);
   }
 
@@ -103,7 +145,7 @@ export function App() {
       setUsers((current) => [user, ...current.filter((item) => item.id !== user.id)]);
       setSelectedUserId(user.id);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Failed to create user");
+      setError(caught instanceof Error ? caught.message : "사용자 생성에 실패했습니다.");
     }
   }
 
@@ -115,13 +157,46 @@ export function App() {
       setSourceId(source.id);
       setAgentMessages([]);
       const generated = await generateIdeas(source.id, title, platform, audience, goal);
+      const firstIdea = generated.ideas[0] ?? null;
       setIdeas(generated.ideas);
-      setSelectedIdea(generated.ideas[0] ?? null);
-      if (generated.ideas[0]) {
-        setScript(await generateScript(source.id, generated.ideas[0]));
+      setSelectedIdea(firstIdea);
+      if (firstIdea) {
+        const pack = await generateScript(source.id, firstIdea);
+        setScript(pack);
+        setPacks([pack]);
       }
+      await refreshSources(selectedUserId);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Something went wrong");
+      setError(caught instanceof Error ? caught.message : "패키지 생성에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleLoadSource(nextSourceId: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const [source, ideasResponse, packResponse, messagesResponse] = await Promise.all([
+        getSource(nextSourceId),
+        listClipIdeas(nextSourceId),
+        listCampaignPacks(nextSourceId),
+        listAgentMessages(nextSourceId),
+      ]);
+      setSourceId(source.id);
+      setTitle(source.title);
+      setAudience(source.audience);
+      setPlatform(source.platform);
+      setTone(source.tone);
+      setGoal(source.goal);
+      setTranscript(archivedTranscriptNote);
+      setIdeas(ideasResponse.ideas);
+      setSelectedIdea(ideasResponse.ideas[0] ?? null);
+      setPacks(packResponse);
+      setScript(packResponse[0] ?? null);
+      setAgentMessages(messagesResponse.messages);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "이전 작업을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
@@ -132,9 +207,16 @@ export function App() {
     setSelectedIdea(idea);
     setError(null);
     try {
-      setScript(await generateScript(sourceId, idea));
+      const existingPacks = await listCampaignPacks(sourceId, idea.id);
+      if (existingPacks[0]) {
+        setScript(existingPacks[0]);
+        return;
+      }
+      const pack = await generateScript(sourceId, idea);
+      setScript(pack);
+      setPacks((current) => [pack, ...current]);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Failed to generate script");
+      setError(caught instanceof Error ? caught.message : "캠페인 팩 생성에 실패했습니다.");
     }
   }
 
@@ -148,7 +230,7 @@ export function App() {
       setAgentMessages(history.messages);
       setAgentInput("");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Failed to ask agent");
+      setError(caught instanceof Error ? caught.message : "에이전트 질문에 실패했습니다.");
     } finally {
       setAgentLoading(false);
     }
@@ -166,7 +248,7 @@ export function App() {
         </div>
         <nav>
           <a className="active">소스 입력</a>
-          <a>클립 아이디어</a>
+          <a>작업함</a>
           <a>캠페인 팩</a>
           <a>RAG 에이전트</a>
         </nav>
@@ -212,7 +294,7 @@ export function App() {
                   value={selectedUserId ?? ""}
                   onChange={(event) => setSelectedUserId(event.target.value || null)}
                 >
-                  <option value="">사용자 없이 진행</option>
+                  <option value="">전체 작업 보기</option>
                   {users.map((user) => (
                     <option key={user.id} value={user.id}>
                       {user.display_name} ({user.email})
@@ -261,6 +343,36 @@ export function App() {
             </label>
           </article>
 
+          <article className="panel history-panel">
+            <div className="panel-title">
+              <Archive size={18} />
+              <h2>이전 작업</h2>
+              <button className="icon-button" type="button" onClick={() => refreshSources()} disabled={sourcesLoading}>
+                <RefreshCw size={16} />
+              </button>
+            </div>
+            <div className="source-list">
+              {sources.map((source) => (
+                <button
+                  className={sourceId === source.id ? "source-card selected" : "source-card"}
+                  key={source.id}
+                  onClick={() => handleLoadSource(source.id)}
+                >
+                  <strong>{source.title}</strong>
+                  <span>
+                    {source.platform} · {source.audience}
+                  </span>
+                  <small>
+                    {source.goal} · chunks {source.chunk_count}
+                  </small>
+                </button>
+              ))}
+              {!sources.length && (
+                <p className="empty">{sourcesLoading ? "작업 목록을 불러오는 중입니다." : "아직 저장된 작업이 없습니다."}</p>
+              )}
+            </div>
+          </article>
+
           <article className="panel ideas-panel">
             <div className="panel-title">
               <Sparkles size={18} />
@@ -292,6 +404,7 @@ export function App() {
             {script ? (
               <div className="script-content">
                 <h3>{script.hook}</h3>
+                {packs.length > 1 && <p className="pack-count">저장된 캠페인 팩 {packs.length}개</p>}
                 <Section title="장면 구성" items={script.scene_plan} />
                 <Section title="자막" items={script.captions} />
                 <Section title="B-roll" items={script.b_roll} />
@@ -328,7 +441,7 @@ export function App() {
                 </div>
               ))}
               {!agentMessages.length && (
-                <p className="empty">소스를 생성한 뒤 RAG 에이전트에게 후킹, 타깃, 카피 방향을 물어볼 수 있습니다.</p>
+                <p className="empty">소스를 생성하거나 이전 작업을 연 뒤 RAG 에이전트에게 후킹, 타깃, 카피 방향을 물어볼 수 있습니다.</p>
               )}
             </div>
             <div className="chat-input">
