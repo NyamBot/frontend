@@ -1,4 +1,5 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+export const KAKAO_LOGIN_URL = `${API_BASE}/api/auth/kakao/login`;
 
 export type User = {
   id: string;
@@ -59,6 +60,31 @@ export type TasteAgentMessage = {
   created_at: string;
 };
 
+function authHeaders(token: string) {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+}
+
+async function parseError(response: Response, fallback: string) {
+  try {
+    const data = await response.json();
+    if (typeof data.detail === "string") return data.detail;
+  } catch {
+    // Ignore non-JSON error bodies.
+  }
+  return fallback;
+}
+
+export async function getCurrentUser(token: string) {
+  const response = await fetch(`${API_BASE}/api/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load current user"));
+  return response.json() as Promise<User>;
+}
+
 export async function listUsers() {
   const response = await fetch(`${API_BASE}/api/users`);
   if (!response.ok) throw new Error("Failed to list users");
@@ -82,7 +108,6 @@ export async function createUser(payload: {
 }
 
 export async function createRestaurant(payload: {
-  user_id?: string | null;
   name: string;
   area: string;
   cuisine: string;
@@ -95,20 +120,21 @@ export async function createRestaurant(payload: {
   address?: string | null;
   road_address?: string | null;
   phone?: string | null;
-}) {
+}, token: string) {
   const response = await fetch(`${API_BASE}/api/restaurants`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(token),
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error("Failed to create restaurant");
+  if (!response.ok) throw new Error(await parseError(response, "Failed to create restaurant"));
   return response.json() as Promise<Restaurant>;
 }
 
-export async function listRestaurants(userId?: string | null) {
-  const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
-  const response = await fetch(`${API_BASE}/api/restaurants${query}`);
-  if (!response.ok) throw new Error("Failed to list restaurants");
+export async function listRestaurants(token: string) {
+  const response = await fetch(`${API_BASE}/api/restaurants`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to list restaurants"));
   return response.json() as Promise<Restaurant[]>;
 }
 
@@ -118,13 +144,14 @@ export async function addRestaurantNote(
     content: string;
     tags: string[];
   },
+  token: string,
 ) {
   const response = await fetch(`${API_BASE}/api/restaurants/${encodeURIComponent(restaurantId)}/notes`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(token),
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error("Failed to add restaurant note");
+  if (!response.ok) throw new Error(await parseError(response, "Failed to add restaurant note"));
   return response.json() as Promise<Restaurant>;
 }
 
@@ -144,13 +171,13 @@ export async function chatTasteAgent(payload: {
   price_level?: string | null;
   tags: string[];
   limit?: number;
-}) {
+}, token: string) {
   const response = await fetch(`${API_BASE}/api/restaurants/chat`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders(token),
     body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error("Failed to ask taste agent");
+  if (!response.ok) throw new Error(await parseError(response, "Failed to ask taste agent"));
   return response.json() as Promise<{
     answer: string;
     recommendations: RestaurantRecommendation[];
@@ -158,9 +185,10 @@ export async function chatTasteAgent(payload: {
   }>;
 }
 
-export async function listTasteAgentMessages(userId?: string | null) {
-  const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
-  const response = await fetch(`${API_BASE}/api/restaurants/chat/messages${query}`);
-  if (!response.ok) throw new Error("Failed to list taste agent messages");
+export async function listTasteAgentMessages(token: string) {
+  const response = await fetch(`${API_BASE}/api/restaurants/chat/messages`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to list taste agent messages"));
   return response.json() as Promise<{ user_id: string | null; messages: TasteAgentMessage[] }>;
 }
