@@ -209,6 +209,47 @@ textarea {
   border-bottom: 1px solid #dedbd2;
 }
 
+.place-search {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #dedbd2;
+}
+
+.place-list {
+  display: grid;
+  gap: 8px;
+}
+
+.place-card {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 11px;
+  border: 1px solid #dedbd2;
+  border-radius: 8px;
+  text-align: left;
+  color: #171717;
+  background: #fbfaf7;
+  cursor: pointer;
+}
+
+.place-card.selected {
+  border-color: #185c55;
+  background: #eef8f5;
+}
+
+.place-card span,
+.place-card small {
+  color: #525252;
+  line-height: 1.35;
+}
+
+.place-card small {
+  font-size: 12px;
+}
+
 .user-actions,
 .chat-input {
   display: grid;
@@ -262,6 +303,13 @@ textarea {
   cursor: wait;
 }
 
+.wide-button.secondary {
+  margin-bottom: 12px;
+  border: 1px solid #d6d2c8;
+  color: #185c55;
+  background: #fbfaf7;
+}
+
 .row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -273,14 +321,14 @@ textarea {
   gap: 10px;
 }
 
-.source-list {
+.restaurant-list {
   display: grid;
   gap: 10px;
   max-height: 430px;
   overflow-y: auto;
 }
 
-.source-card,
+.restaurant-card,
 .idea-card {
   display: grid;
   gap: 8px;
@@ -293,20 +341,20 @@ textarea {
   cursor: pointer;
 }
 
-.source-card.selected,
+.restaurant-card.selected,
 .idea-card.selected {
   border-color: #185c55;
   background: #eef8f5;
 }
 
-.source-card span,
+.restaurant-card span,
 .idea-card span {
   color: #525252;
   font-size: 14px;
   line-height: 1.45;
 }
 
-.source-card small,
+.restaurant-card small,
 .idea-card small {
   color: #806d32;
   font-weight: 700;
