@@ -11,6 +11,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -120,7 +121,7 @@ h1 {
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(360px, 0.95fr) minmax(300px, 0.75fr) minmax(420px, 1.1fr);
+  grid-template-columns: minmax(340px, 0.95fr) minmax(280px, 0.72fr) minmax(380px, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -171,6 +172,7 @@ label {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid #d6d2c8;
@@ -184,6 +186,46 @@ textarea {
   min-height: 300px;
   resize: vertical;
   line-height: 1.5;
+}
+
+.user-box {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #dedbd2;
+}
+
+.user-actions,
+.chat-input {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.user-actions button,
+.chat-input button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: #185c55;
+  cursor: pointer;
+}
+
+.chat-input button {
+  width: 42px;
+  padding: 0;
+}
+
+.chat-input button:disabled,
+.user-actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .row {
@@ -229,6 +271,46 @@ textarea {
   margin: 0 0 16px;
   font-size: 22px;
   line-height: 1.18;
+}
+
+.agent-panel {
+  grid-column: 2 / 4;
+}
+
+.chat-log {
+  display: grid;
+  min-height: 210px;
+  max-height: 360px;
+  gap: 10px;
+  margin-bottom: 12px;
+  overflow-y: auto;
+}
+
+.chat-message {
+  display: grid;
+  gap: 6px;
+  max-width: 82%;
+  padding: 12px;
+  border: 1px solid #dedbd2;
+  border-radius: 8px;
+  background: #fbfaf7;
+}
+
+.chat-message.user {
+  justify-self: end;
+  border-color: #185c55;
+  background: #eef8f5;
+}
+
+.chat-message p {
+  margin: 0;
+  color: #333;
+  line-height: 1.45;
+}
+
+.chat-message small {
+  color: #806d32;
+  font-weight: 700;
 }
 
 .section {
@@ -291,5 +373,13 @@ li {
 
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .agent-panel {
+    grid-column: auto;
+  }
+
+  .topbar {
+    display: grid;
   }
 }
