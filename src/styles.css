@@ -126,6 +126,13 @@ h1 {
   align-items: start;
 }
 
+.taste-grid {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.9fr) minmax(360px, 0.9fr) minmax(420px, 1.1fr);
+  gap: 16px;
+  align-items: start;
+}
+
 .panel {
   padding: 18px;
   border: 1px solid #dedbd2;
@@ -192,6 +199,10 @@ textarea {
   line-height: 1.5;
 }
 
+.question-box {
+  min-height: 150px;
+}
+
 .user-box {
   margin-bottom: 16px;
   padding-bottom: 16px;
@@ -228,6 +239,25 @@ textarea {
 
 .chat-input button:disabled,
 .user-actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.wide-button {
+  display: inline-flex;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: #185c55;
+  cursor: pointer;
+}
+
+.wide-button:disabled {
   opacity: 0.6;
   cursor: wait;
 }
@@ -315,6 +345,57 @@ textarea {
 
 .agent-panel {
   grid-column: 2 / 4;
+}
+
+.history-panel {
+  grid-column: 2 / 4;
+}
+
+.result-panel {
+  grid-row: span 2;
+}
+
+.recommendation-list {
+  display: grid;
+  gap: 12px;
+}
+
+.recommendation-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #dedbd2;
+  border-radius: 8px;
+  background: #fbfaf7;
+}
+
+.recommendation-card strong,
+.recommendation-card span {
+  display: block;
+}
+
+.recommendation-card span {
+  margin-top: 3px;
+  color: #525252;
+  font-size: 13px;
+}
+
+.recommendation-card p,
+.recommendation-card blockquote {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.recommendation-card blockquote {
+  padding-left: 10px;
+  border-left: 3px solid #185c55;
+  color: #333;
+}
+
+.recommendation-card small,
+.recommendation-card a {
+  color: #806d32;
+  font-weight: 700;
 }
 
 .chat-log {
@@ -415,7 +496,15 @@ li {
     grid-template-columns: 1fr;
   }
 
+  .taste-grid {
+    grid-template-columns: 1fr;
+  }
+
   .agent-panel {
+    grid-column: auto;
+  }
+
+  .history-panel {
     grid-column: auto;
   }
 
