@@ -1,13 +1,16 @@
 import { MapPin, MessageSquare, Plus, RefreshCw, Search, Sparkles, Store, Utensils } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
+  KakaoPlace,
   Restaurant,
   RestaurantRecommendation,
   TasteAgentMessage,
+  addRestaurantNote,
   chatTasteAgent,
   createRestaurant,
   listRestaurants,
   listTasteAgentMessages,
+  searchKakaoPlaces,
 } from "./api";
 
 const sampleRestaurants = [
@@ -48,8 +51,13 @@ export function App() {
   const [moodTags, setMoodTags] = useState(sampleRestaurants[0].mood_tags.join(","));
   const [signatureMenus, setSignatureMenus] = useState(sampleRestaurants[0].signature_menus.join(","));
   const [note, setNote] = useState(sampleRestaurants[0].note);
+  const [kakaoQuery, setKakaoQuery] = useState("성수 맛집");
+  const [kakaoPlaces, setKakaoPlaces] = useState<KakaoPlace[]>([]);
+  const [selectedPlace, setSelectedPlace] = useState<KakaoPlace | null>(null);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [placeLoading, setPlaceLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,6 +93,14 @@ export function App() {
     setSaving(true);
     setError(null);
     try {
+      if (selectedRestaurantId) {
+        await addRestaurantNote(selectedRestaurantId, {
+          content: note,
+          tags: splitCsv(moodTags),
+        });
+        await refresh();
+        return;
+      }
       await createRestaurant({
         name,
         area: restaurantArea,
@@ -93,7 +109,11 @@ export function App() {
         mood_tags: splitCsv(moodTags),
         signature_menus: splitCsv(signatureMenus),
         note,
-        kakao_place_url: "https://map.kakao.com",
+        kakao_place_id: selectedPlace?.id ?? null,
+        kakao_place_url: selectedPlace?.place_url ?? "https://map.kakao.com",
+        address: selectedPlace?.address_name ?? null,
+        road_address: selectedPlace?.road_address_name ?? null,
+        phone: selectedPlace?.phone ?? null,
       });
       await refresh();
     } catch (caught) {
@@ -101,6 +121,50 @@ export function App() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleSelectRestaurant(restaurant: Restaurant) {
+    setSelectedRestaurantId(restaurant.id);
+    setName(restaurant.name);
+    setRestaurantArea(restaurant.area);
+    setRestaurantCuisine(restaurant.cuisine);
+    setPriceLevel(restaurant.price_level);
+    setMoodTags(restaurant.mood_tags.join(","));
+    setSignatureMenus(restaurant.signature_menus.join(","));
+    setSelectedPlace(null);
+    setNote("");
+  }
+
+  function handleNewRestaurant() {
+    setSelectedRestaurantId(null);
+    setSelectedPlace(null);
+    setNote("");
+  }
+
+  async function handleSearchKakao() {
+    if (!kakaoQuery.trim()) return;
+    setPlaceLoading(true);
+    setError(null);
+    try {
+      const response = await searchKakaoPlaces(kakaoQuery.trim(), 5);
+      setKakaoPlaces(response.places);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "카카오 장소 검색에 실패했습니다.");
+      setKakaoPlaces([]);
+    } finally {
+      setPlaceLoading(false);
+    }
+  }
+
+  function handleSelectPlace(place: KakaoPlace) {
+    setSelectedPlace(place);
+    setName(place.place_name);
+    setRestaurantArea(extractArea(place.address_name || place.road_address_name));
+    setRestaurantCuisine(extractCuisine(place.category_name));
+    setNote((current) => {
+      const base = `${place.place_name}은 ${place.category_name || "음식점"} 카테고리의 장소입니다. 주소는 ${place.road_address_name || place.address_name}입니다.`;
+      return current.trim() ? current : base;
+    });
   }
 
   async function handleAsk() {
@@ -189,7 +253,36 @@ export function App() {
           <article className="panel register-panel">
             <div className="panel-title">
               <Plus size={18} />
-              <h2>맛집 데이터 등록</h2>
+              <h2>{selectedRestaurantId ? "맛집 메모 추가" : "맛집 데이터 등록"}</h2>
+            </div>
+            {selectedRestaurantId && (
+              <button className="wide-button secondary" type="button" onClick={handleNewRestaurant}>
+                새 맛집 등록으로 전환
+              </button>
+            )}
+            <div className="place-search">
+              <label>
+                카카오 장소 검색
+                <input value={kakaoQuery} onChange={(event) => setKakaoQuery(event.target.value)} />
+              </label>
+              <button className="wide-button" type="button" disabled={placeLoading} onClick={handleSearchKakao}>
+                <Search size={18} />
+                {placeLoading ? "검색 중..." : "장소 검색"}
+              </button>
+              <div className="place-list">
+                {kakaoPlaces.map((place) => (
+                  <button
+                    className={selectedPlace?.id === place.id ? "place-card selected" : "place-card"}
+                    key={place.id}
+                    type="button"
+                    onClick={() => handleSelectPlace(place)}
+                  >
+                    <strong>{place.place_name}</strong>
+                    <span>{place.category_name}</span>
+                    <small>{place.road_address_name || place.address_name}</small>
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="sample-row">
               {sampleRestaurants.map((sample, index) => (
@@ -230,7 +323,7 @@ export function App() {
             </label>
             <button className="wide-button" disabled={saving} onClick={handleSaveRestaurant}>
               <Store size={18} />
-              {saving ? "저장 중..." : "맛집 메모 저장"}
+              {saving ? "저장 중..." : selectedRestaurantId ? "선택한 맛집에 메모 추가" : "맛집 메모 저장"}
             </button>
           </article>
 
@@ -270,13 +363,13 @@ export function App() {
                 <RefreshCw size={16} />
               </button>
             </div>
-            <div className="source-list">
+            <div className="restaurant-list">
               {restaurants.map((restaurant) => (
-                <section className="source-card" key={restaurant.id}>
+                <button className="restaurant-card" key={restaurant.id} type="button" onClick={() => handleSelectRestaurant(restaurant)}>
                   <strong>{restaurant.name}</strong>
                   <span>{restaurant.area} · {restaurant.cuisine}</span>
                   <small>{restaurant.mood_tags.join(", ")} · 메모 {restaurant.note_count}개</small>
-                </section>
+                </button>
               ))}
               {!restaurants.length && <p className="empty">아직 저장된 맛집이 없습니다.</p>}
             </div>
@@ -309,4 +402,14 @@ function splitCsv(value: string) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function extractArea(address: string) {
+  const parts = address.split(" ").filter(Boolean);
+  return parts[1] ?? parts[0] ?? "";
+}
+
+function extractCuisine(category: string) {
+  const parts = category.split(">").map((item) => item.trim()).filter(Boolean);
+  return parts[parts.length - 1] ?? "음식점";
 }
