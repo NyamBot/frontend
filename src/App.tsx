@@ -336,6 +336,21 @@ export function App() {
         </section>
         {error && <div className="error-banner">{error}</div>}
 
+        <section className="metrics-row">
+          <div>
+            <span>저장된 맛집</span>
+            <strong>{restaurants.length}</strong>
+          </div>
+          <div>
+            <span>추천 결과</span>
+            <strong>{recommendations.length}</strong>
+          </div>
+          <div>
+            <span>채팅 기록</span>
+            <strong>{messages.length}</strong>
+          </div>
+        </section>
+
         <section className="taste-grid">
           <article className="panel chat-panel">
             <div className="panel-title">
@@ -363,86 +378,6 @@ export function App() {
             <button className="wide-button" disabled={loading || !token} onClick={handleAsk}>
               <Search size={18} />
               {loading ? "저장된 메모 검색 중..." : "하이브리드 RAG 추천 받기"}
-            </button>
-          </article>
-
-          <article className="panel register-panel">
-            <div className="panel-title">
-              <Plus size={18} />
-              <h2>{selectedRestaurantId ? "맛집 메모 추가" : "맛집 데이터 등록"}</h2>
-            </div>
-            {selectedRestaurantId && (
-              <button className="wide-button secondary" type="button" onClick={handleNewRestaurant}>
-                새 맛집 등록으로 전환
-              </button>
-            )}
-            <div className="place-search">
-              <label>
-                카카오 장소 검색
-                <input value={kakaoQuery} onChange={(event) => setKakaoQuery(event.target.value)} />
-              </label>
-              <button className="wide-button" type="button" disabled={placeLoading} onClick={handleSearchKakao}>
-                <Search size={18} />
-                {placeLoading ? "검색 중..." : "장소 검색"}
-              </button>
-              <div className="place-list">
-                {kakaoPlaces.map((place) => (
-                  <button
-                    className={selectedPlace?.id === place.id ? "place-card selected" : "place-card"}
-                    key={place.id}
-                    type="button"
-                    onClick={() => handleSelectPlace(place)}
-                  >
-                    <strong>{place.place_name}</strong>
-                    <span>{place.category_name}</span>
-                    <small>{place.road_address_name || place.address_name}</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="sample-row">
-              {sampleRestaurants.map((sample, index) => (
-                <button key={sample.name} type="button" onClick={() => loadSample(index)}>
-                  샘플 {index + 1}
-                </button>
-              ))}
-              <button className="sample-save-button" disabled={saving || !token} type="button" onClick={handleSaveSamples}>
-                샘플 전체 저장
-              </button>
-            </div>
-            <label>
-              식당명
-              <input value={name} onChange={(event) => setName(event.target.value)} />
-            </label>
-            <div className="row">
-              <label>
-                지역
-                <input value={restaurantArea} onChange={(event) => setRestaurantArea(event.target.value)} />
-              </label>
-              <label>
-                음식 종류
-                <input value={restaurantCuisine} onChange={(event) => setRestaurantCuisine(event.target.value)} />
-              </label>
-            </div>
-            <label>
-              가격대
-              <input value={priceLevel} onChange={(event) => setPriceLevel(event.target.value)} />
-            </label>
-            <label>
-              태그
-              <input value={moodTags} onChange={(event) => setMoodTags(event.target.value)} />
-            </label>
-            <label>
-              대표 메뉴
-              <input value={signatureMenus} onChange={(event) => setSignatureMenus(event.target.value)} />
-            </label>
-            <label>
-              방문 메모/리뷰
-              <textarea value={note} onChange={(event) => setNote(event.target.value)} />
-            </label>
-            <button className="wide-button" disabled={saving || !token} onClick={handleSaveRestaurant}>
-              <Store size={18} />
-              {saving ? "저장 중..." : selectedRestaurantId ? "선택한 맛집에 메모 추가" : "맛집 메모 저장"}
             </button>
           </article>
 
@@ -480,30 +415,116 @@ export function App() {
             </div>
           </article>
 
-          <article className="panel saved-panel">
-            <div className="panel-title">
-              <MapPin size={18} />
-              <h2>저장된 맛집</h2>
-              <button className="icon-button" type="button" onClick={() => refresh()}>
-                <RefreshCw size={16} />
-              </button>
-            </div>
-            <div className="restaurant-list">
-              {restaurants.map((restaurant) => (
-                <button
-                  className={selectedRestaurantId === restaurant.id ? "restaurant-card selected" : "restaurant-card"}
-                  key={restaurant.id}
-                  type="button"
-                  onClick={() => handleSelectRestaurant(restaurant)}
-                >
-                  <strong>{restaurant.name}</strong>
-                  <span>{restaurant.area} · {restaurant.cuisine}</span>
-                  <small>{restaurant.mood_tags.join(", ")} · 메모 {restaurant.note_count}개</small>
+          <section className="side-stack">
+            <article className="panel register-panel">
+              <div className="panel-title">
+                <Plus size={18} />
+                <h2>{selectedRestaurantId ? "맛집 메모 추가" : "맛집 데이터 등록"}</h2>
+              </div>
+              {selectedRestaurantId && (
+                <button className="wide-button secondary" type="button" onClick={handleNewRestaurant}>
+                  새 맛집 등록으로 전환
                 </button>
-              ))}
-              {!restaurants.length && <p className="empty">아직 저장된 맛집이 없습니다.</p>}
-            </div>
-          </article>
+              )}
+              <div className="place-search">
+                <div className="search-line">
+                  <label>
+                    카카오 장소 검색
+                    <input value={kakaoQuery} onChange={(event) => setKakaoQuery(event.target.value)} />
+                  </label>
+                  <button type="button" disabled={placeLoading} onClick={handleSearchKakao}>
+                    <Search size={18} />
+                    {placeLoading ? "검색 중" : "검색"}
+                  </button>
+                </div>
+                <div className="place-list">
+                  {kakaoPlaces.map((place) => (
+                    <button
+                      className={selectedPlace?.id === place.id ? "place-card selected" : "place-card"}
+                      key={place.id}
+                      type="button"
+                      onClick={() => handleSelectPlace(place)}
+                    >
+                      <strong>{place.place_name}</strong>
+                      <span>{place.category_name}</span>
+                      <small>{place.road_address_name || place.address_name}</small>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="sample-row">
+                {sampleRestaurants.map((sample, index) => (
+                  <button key={sample.name} type="button" onClick={() => loadSample(index)}>
+                    샘플 {index + 1}
+                  </button>
+                ))}
+                <button className="sample-save-button" disabled={saving || !token} type="button" onClick={handleSaveSamples}>
+                  샘플 전체 저장
+                </button>
+              </div>
+              <label>
+                식당명
+                <input value={name} onChange={(event) => setName(event.target.value)} />
+              </label>
+              <div className="row">
+                <label>
+                  지역
+                  <input value={restaurantArea} onChange={(event) => setRestaurantArea(event.target.value)} />
+                </label>
+                <label>
+                  음식 종류
+                  <input value={restaurantCuisine} onChange={(event) => setRestaurantCuisine(event.target.value)} />
+                </label>
+              </div>
+              <div className="row">
+                <label>
+                  가격대
+                  <input value={priceLevel} onChange={(event) => setPriceLevel(event.target.value)} />
+                </label>
+                <label>
+                  대표 메뉴
+                  <input value={signatureMenus} onChange={(event) => setSignatureMenus(event.target.value)} />
+                </label>
+              </div>
+              <label>
+                태그
+                <input value={moodTags} onChange={(event) => setMoodTags(event.target.value)} />
+              </label>
+              <label>
+                방문 메모/리뷰
+                <textarea value={note} onChange={(event) => setNote(event.target.value)} />
+              </label>
+              <button className="wide-button" disabled={saving || !token} onClick={handleSaveRestaurant}>
+                <Store size={18} />
+                {saving ? "저장 중..." : selectedRestaurantId ? "선택한 맛집에 메모 추가" : "맛집 메모 저장"}
+              </button>
+            </article>
+
+            <article className="panel saved-panel">
+              <div className="panel-title">
+                <MapPin size={18} />
+                <h2>저장된 맛집</h2>
+                <button className="icon-button" type="button" onClick={() => refresh()}>
+                  <RefreshCw size={16} />
+                </button>
+              </div>
+              <div className="restaurant-list">
+                {restaurants.map((restaurant) => (
+                  <button
+                    className={selectedRestaurantId === restaurant.id ? "restaurant-card selected" : "restaurant-card"}
+                    key={restaurant.id}
+                    type="button"
+                    onClick={() => handleSelectRestaurant(restaurant)}
+                  >
+                    <strong>{restaurant.name}</strong>
+                    <span>{restaurant.area} · {restaurant.cuisine}</span>
+                    <small>{restaurant.mood_tags.join(", ")} · 메모 {restaurant.note_count}개</small>
+                  </button>
+                ))}
+                {!restaurants.length && <p className="empty">아직 저장된 맛집이 없습니다.</p>}
+              </div>
+            </article>
+          </section>
 
           <article className="panel history-panel">
             <div className="panel-title">
