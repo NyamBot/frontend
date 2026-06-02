@@ -40,6 +40,7 @@ export function App() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [messages, setMessages] = useState<TasteAgentMessage[]>([]);
   const [recommendations, setRecommendations] = useState<RestaurantRecommendation[]>([]);
+  const [assistantAnswer, setAssistantAnswer] = useState("");
   const [query, setQuery] = useState("성수에서 조용한 데이트 맛집 알려줘");
   const [area, setArea] = useState("성수");
   const [cuisine, setCuisine] = useState("");
@@ -123,6 +124,32 @@ export function App() {
     }
   }
 
+  async function handleSaveSamples() {
+    setSaving(true);
+    setError(null);
+    try {
+      await Promise.all(
+        sampleRestaurants.map((sample) =>
+          createRestaurant({
+            name: sample.name,
+            area: sample.area,
+            cuisine: sample.cuisine,
+            price_level: sample.price_level,
+            mood_tags: sample.mood_tags,
+            signature_menus: sample.signature_menus,
+            note: sample.note,
+            kakao_place_url: sample.kakao_place_url,
+          }),
+        ),
+      );
+      await refresh();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "샘플 맛집 저장에 실패했습니다.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleSelectRestaurant(restaurant: Restaurant) {
     setSelectedRestaurantId(restaurant.id);
     setName(restaurant.name);
@@ -180,6 +207,7 @@ export function App() {
         tags: splitCsv(tags),
         limit: 3,
       });
+      setAssistantAnswer(response.answer);
       setRecommendations(response.recommendations);
       await refresh();
     } catch (caught) {
@@ -290,6 +318,9 @@ export function App() {
                   샘플 {index + 1}
                 </button>
               ))}
+              <button className="sample-save-button" disabled={saving} type="button" onClick={handleSaveSamples}>
+                샘플 전체 저장
+              </button>
             </div>
             <label>
               식당명
@@ -333,6 +364,12 @@ export function App() {
               <h2>추천 결과</h2>
             </div>
             <div className="recommendation-list">
+              {assistantAnswer && (
+                <section className="answer-card">
+                  <strong>AI 답변</strong>
+                  <p>{assistantAnswer}</p>
+                </section>
+              )}
               {recommendations.map((recommendation) => (
                 <section className="recommendation-card" key={recommendation.restaurant.id}>
                   <div>
@@ -365,7 +402,12 @@ export function App() {
             </div>
             <div className="restaurant-list">
               {restaurants.map((restaurant) => (
-                <button className="restaurant-card" key={restaurant.id} type="button" onClick={() => handleSelectRestaurant(restaurant)}>
+                <button
+                  className={selectedRestaurantId === restaurant.id ? "restaurant-card selected" : "restaurant-card"}
+                  key={restaurant.id}
+                  type="button"
+                  onClick={() => handleSelectRestaurant(restaurant)}
+                >
                   <strong>{restaurant.name}</strong>
                   <span>{restaurant.area} · {restaurant.cuisine}</span>
                   <small>{restaurant.mood_tags.join(", ")} · 메모 {restaurant.note_count}개</small>
