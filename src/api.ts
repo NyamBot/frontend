@@ -179,3 +179,100 @@ export async function listAgentMessages(sourceId: string) {
   if (!response.ok) throw new Error("Failed to list agent messages");
   return response.json() as Promise<{ source_id: string; messages: AgentMessage[] }>;
 }
+
+export type Restaurant = {
+  id: string;
+  user_id: string | null;
+  name: string;
+  area: string;
+  cuisine: string;
+  price_level: string;
+  mood_tags: string[];
+  signature_menus: string[];
+  kakao_place_id: string | null;
+  kakao_place_url: string | null;
+  address: string | null;
+  road_address: string | null;
+  phone: string | null;
+  note_count: number;
+  created_at: string;
+};
+
+export type RestaurantRecommendation = {
+  restaurant: Restaurant;
+  reason: string;
+  evidence: string[];
+  menu_tip: string;
+  caution: string;
+  score: number;
+};
+
+export type TasteAgentMessage = {
+  id: string;
+  user_id: string | null;
+  role: "user" | "assistant";
+  content: string;
+  retrieved_context: string[];
+  created_at: string;
+};
+
+export async function createRestaurant(payload: {
+  user_id?: string | null;
+  name: string;
+  area: string;
+  cuisine: string;
+  price_level: string;
+  mood_tags: string[];
+  signature_menus: string[];
+  note: string;
+  kakao_place_id?: string | null;
+  kakao_place_url?: string | null;
+  address?: string | null;
+  road_address?: string | null;
+  phone?: string | null;
+}) {
+  const response = await fetch(`${API_BASE}/api/restaurants`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error("Failed to create restaurant");
+  return response.json() as Promise<Restaurant>;
+}
+
+export async function listRestaurants(userId?: string | null) {
+  const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+  const response = await fetch(`${API_BASE}/api/restaurants${query}`);
+  if (!response.ok) throw new Error("Failed to list restaurants");
+  return response.json() as Promise<Restaurant[]>;
+}
+
+export async function chatTasteAgent(payload: {
+  user_id?: string | null;
+  query: string;
+  message: string;
+  area?: string | null;
+  cuisine?: string | null;
+  price_level?: string | null;
+  tags: string[];
+  limit?: number;
+}) {
+  const response = await fetch(`${API_BASE}/api/restaurants/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error("Failed to ask taste agent");
+  return response.json() as Promise<{
+    answer: string;
+    recommendations: RestaurantRecommendation[];
+    context: string[];
+  }>;
+}
+
+export async function listTasteAgentMessages(userId?: string | null) {
+  const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+  const response = await fetch(`${API_BASE}/api/restaurants/chat/messages${query}`);
+  if (!response.ok) throw new Error("Failed to list taste agent messages");
+  return response.json() as Promise<{ user_id: string | null; messages: TasteAgentMessage[] }>;
+}
