@@ -1,7 +1,4 @@
 .env*
-!.env.example
-!.env.development.example
-!.env.production.example
 node_modules/
 dist/
 tsconfig.tsbuildinfo
