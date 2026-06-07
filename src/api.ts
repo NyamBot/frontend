@@ -26,6 +26,8 @@ export type Restaurant = {
   address: string | null;
   road_address: string | null;
   phone: string | null;
+  latitude: number | null;
+  longitude: number | null;
   note_count: number;
   created_at: string;
 };
@@ -85,6 +87,16 @@ export async function getCurrentUser(token: string) {
   return response.json() as Promise<User>;
 }
 
+export async function exchangeAuthCode(code: string) {
+  const response = await fetch(`${API_BASE}/api/auth/session`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to complete login"));
+  return response.json() as Promise<{ access_token: string; token_type: "bearer" }>;
+}
+
 export async function listUsers() {
   const response = await fetch(`${API_BASE}/api/users`);
   if (!response.ok) throw new Error("Failed to list users");
@@ -120,6 +132,8 @@ export async function createRestaurant(payload: {
   address?: string | null;
   road_address?: string | null;
   phone?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }, token: string) {
   const response = await fetch(`${API_BASE}/api/restaurants`, {
     method: "POST",
