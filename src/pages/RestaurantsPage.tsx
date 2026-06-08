@@ -22,12 +22,18 @@ export function RestaurantsPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token, selectedCity, selectedDistrict, selectedTown]);
 
   async function refresh() {
     if (!token) return;
     try {
-      setRestaurants(await listRestaurants(token));
+      setRestaurants(
+        await listRestaurants(token, {
+          city: selectedCity,
+          district: selectedDistrict,
+          town: selectedTown,
+        }),
+      );
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "저장된 맛집을 불러오지 못했습니다.");
@@ -119,7 +125,7 @@ export function RestaurantsPage() {
           </button>
         </div>
 
-        {restaurants.length > 0 && (
+        {(restaurants.length > 0 || hasLocationFilter) && (
           <section className="space-y-2 rounded-2xl border border-zinc-200 bg-white p-3">
             <FilterRow
               label="시"
@@ -226,7 +232,7 @@ export function RestaurantsPage() {
           </div>
         )}
 
-        {!restaurants.length && !error && (
+        {!restaurants.length && !hasLocationFilter && !error && (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
             <MiniMascot className="h-14 w-14" />
             <span className="text-sm text-zinc-400">
@@ -237,7 +243,7 @@ export function RestaurantsPage() {
           </div>
         )}
 
-        {restaurants.length > 0 && filteredRows.length === 0 && !error && (
+        {hasLocationFilter && filteredRows.length === 0 && !error && (
           <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-400">
             선택한 지역에 저장된 맛집이 없어요.
           </div>

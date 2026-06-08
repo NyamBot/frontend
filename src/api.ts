@@ -163,8 +163,16 @@ export async function createRestaurant(payload: {
   return response.json() as Promise<Restaurant>;
 }
 
-export async function listRestaurants(token: string) {
-  const response = await fetch(`${API_BASE}/api/restaurants`, {
+export async function listRestaurants(
+  token: string,
+  filters: { city?: string; district?: string; town?: string } = {},
+) {
+  const params = new URLSearchParams();
+  if (filters.city) params.set("city", filters.city);
+  if (filters.district) params.set("district", filters.district);
+  if (filters.town) params.set("town", filters.town);
+  const query = params.toString();
+  const response = await fetch(`${API_BASE}/api/restaurants${query ? `?${query}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to list restaurants"));
