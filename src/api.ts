@@ -6,6 +6,15 @@ export type SourceResponse = {
   chunk_count: number;
 };
 
+export type SourceDetail = SourceResponse & {
+  user_id: string | null;
+  audience: string;
+  platform: string;
+  tone: string;
+  goal: string;
+  created_at: string;
+};
+
 export type User = {
   id: string;
   email: string;
@@ -73,6 +82,19 @@ export async function createSource(payload: {
   return response.json() as Promise<SourceResponse>;
 }
 
+export async function listSources(userId?: string | null) {
+  const query = userId ? `?user_id=${encodeURIComponent(userId)}` : "";
+  const response = await fetch(`${API_BASE}/api/sources${query}`);
+  if (!response.ok) throw new Error("Failed to list sources");
+  return response.json() as Promise<SourceDetail[]>;
+}
+
+export async function getSource(sourceId: string) {
+  const response = await fetch(`${API_BASE}/api/sources/${encodeURIComponent(sourceId)}`);
+  if (!response.ok) throw new Error("Failed to load source");
+  return response.json() as Promise<SourceDetail>;
+}
+
 export async function listUsers() {
   const response = await fetch(`${API_BASE}/api/users`);
   if (!response.ok) throw new Error("Failed to list users");
@@ -126,6 +148,20 @@ export async function generateScript(sourceId: string, idea: ClipIdea) {
   });
   if (!response.ok) throw new Error("Failed to generate script");
   return response.json() as Promise<ScriptPack>;
+}
+
+export async function listClipIdeas(sourceId: string) {
+  const response = await fetch(`${API_BASE}/api/clips?source_id=${encodeURIComponent(sourceId)}`);
+  if (!response.ok) throw new Error("Failed to list clip ideas");
+  return response.json() as Promise<{ source_id: string; ideas: ClipIdea[] }>;
+}
+
+export async function listCampaignPacks(sourceId: string, clipIdeaId?: string | null) {
+  const params = new URLSearchParams({ source_id: sourceId });
+  if (clipIdeaId) params.set("clip_idea_id", clipIdeaId);
+  const response = await fetch(`${API_BASE}/api/clips/packs?${params.toString()}`);
+  if (!response.ok) throw new Error("Failed to list campaign packs");
+  return response.json() as Promise<ScriptPack[]>;
 }
 
 export async function chatAgent(sourceId: string, message: string) {

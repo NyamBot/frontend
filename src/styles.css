@@ -140,6 +140,10 @@ h1 {
   margin-bottom: 14px;
 }
 
+.panel-title .icon-button {
+  margin-left: auto;
+}
+
 .panel-title h2 {
   margin: 0;
   font-size: 16px;
@@ -239,6 +243,14 @@ textarea {
   gap: 10px;
 }
 
+.source-list {
+  display: grid;
+  gap: 10px;
+  max-height: 430px;
+  overflow-y: auto;
+}
+
+.source-card,
 .idea-card {
   display: grid;
   gap: 8px;
@@ -251,26 +263,54 @@ textarea {
   cursor: pointer;
 }
 
+.source-card.selected,
 .idea-card.selected {
   border-color: #185c55;
   background: #eef8f5;
 }
 
+.source-card span,
 .idea-card span {
   color: #525252;
   font-size: 14px;
   line-height: 1.45;
 }
 
+.source-card small,
 .idea-card small {
   color: #806d32;
   font-weight: 700;
+}
+
+.icon-button {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d6d2c8;
+  border-radius: 8px;
+  color: #185c55;
+  background: #fbfaf7;
+  cursor: pointer;
+}
+
+.icon-button:disabled {
+  opacity: 0.55;
+  cursor: wait;
 }
 
 .script-content h3 {
   margin: 0 0 16px;
   font-size: 22px;
   line-height: 1.18;
+}
+
+.pack-count {
+  margin: -6px 0 12px;
+  color: #806d32;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .agent-panel {
