@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, Clock3, RefreshCw } from "lucide-react";
-import { listTasteAgentMessages, type TasteAgentMessage } from "../api";
+import { useNavigate } from "react-router-dom";
+import { ChevronRight, Clock3, RefreshCw } from "lucide-react";
+import { listTasteAgentSessions, type TasteAgentSession } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
 import { Button, Card } from "../components/ui";
-import { cn } from "../lib/utils";
 
 export function HistoryPage() {
   const { token } = useAuth();
-  const [messages, setMessages] = useState<TasteAgentMessage[]>([]);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [sessions, setSessions] = useState<TasteAgentSession[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -20,8 +20,9 @@ export function HistoryPage() {
   async function refresh() {
     if (!token) return;
     try {
-      const data = await listTasteAgentMessages(token);
-      setMessages(data.messages);
+      const data = await listTasteAgentSessions(token);
+      setSessions(data.sessions);
+      setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "기록을 불러오지 못했습니다.");
     }
@@ -37,7 +38,7 @@ export function HistoryPage() {
             </span>
             <div className="flex-1">
               <h2 className="text-sm font-semibold text-zinc-900">대화 기록</h2>
-              <p className="text-xs text-zinc-400">근거 메모와 함께 이전 추천을 다시 보세요</p>
+              <p className="text-xs text-zinc-400">대화 세션을 선택해서 다시 확인해요.</p>
             </div>
             <Button variant="ghost" size="icon" onClick={refresh} aria-label="새로고침">
               <RefreshCw size={15} />
@@ -51,61 +52,40 @@ export function HistoryPage() {
           )}
 
           <div className="divide-y divide-zinc-100">
-            {messages.map((m) => {
-              const isUser = m.role === "user";
-              const hasContext = m.retrieved_context.length > 0;
-              const open = openId === m.id;
+            {sessions.map((session) => {
+              const questions = session.messages.filter((message) => message.role === "user");
+              const firstQuestion = questions[0]?.content ?? session.title;
+
               return (
-                <div key={m.id} className="px-5 py-3.5">
-                  <div className="mb-1 flex items-center justify-between">
-                    <span
-                      className={cn(
-                        "text-[11px] font-semibold",
-                        isUser ? "text-zinc-500" : "text-leaf-600",
-                      )}
-                    >
-                      {isUser ? "나" : "NyamBot"}
+                <button
+                  key={session.id}
+                  type="button"
+                  onClick={() => navigate(`/history/${session.id}`, { state: { session } })}
+                  className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-zinc-50"
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xs font-bold text-leaf-600">
+                    {questions.length}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="line-clamp-2 text-sm font-semibold leading-relaxed text-zinc-900">
+                      {firstQuestion}
                     </span>
-                    {hasContext && (
-                      <button
-                        type="button"
-                        onClick={() => setOpenId(open ? null : m.id)}
-                        className="inline-flex items-center gap-1 text-[11px] text-zinc-400 hover:text-zinc-600"
-                      >
-                        근거 {m.retrieved_context.length}개
-                        <ChevronDown
-                          size={12}
-                          className={cn("transition-transform", open && "rotate-180")}
-                        />
-                      </button>
-                    )}
-                  </div>
-                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-800">
-                    {m.content}
-                  </p>
-                  {hasContext && open && (
-                    <ul className="mt-2 space-y-1.5">
-                      {m.retrieved_context.map((ctx, i) => (
-                        <li
-                          key={i}
-                          className="border-l-2 border-leaf-200 bg-leaf-50/50 px-3 py-1.5 text-xs italic text-zinc-600"
-                        >
-                          {ctx}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                    <span className="mt-1 block text-[11px] text-zinc-400">
+                      {questions.length}개 질문 · {formatDate(session.updated_at)}
+                    </span>
+                  </span>
+                  <ChevronRight size={18} className="shrink-0 text-zinc-300" />
+                </button>
               );
             })}
 
-            {!messages.length && !error && (
+            {!sessions.length && !error && (
               <div className="flex flex-col items-center gap-3 py-12 text-center">
                 <MiniMascot className="h-14 w-14" />
                 <span className="text-sm text-zinc-400">
                   아직 대화 기록이 없어요.
                   <br />
-                  먼저 채팅에서 질문을 해볼까요?
+                  먼저 채팅에서 질문해볼까요?
                 </span>
               </div>
             )}
@@ -114,4 +94,15 @@ export function HistoryPage() {
       </div>
     </div>
   );
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
