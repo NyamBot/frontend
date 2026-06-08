@@ -1,83 +1,133 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Leaf, Search, Store } from "lucide-react";
+import { ArrowLeft, Plus, Search, X } from "lucide-react";
 import {
-  addRestaurantNote,
   createRestaurant,
-  listRestaurants,
+  getRestaurant,
   searchKakaoPlaces,
+  updateRestaurant,
   type KakaoPlace,
   type Restaurant,
 } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { Button, Field, TextArea, TextInput } from "../components/ui";
-import { cn, extractArea, extractCuisine, splitCsv } from "../lib/utils";
-import { SAMPLES } from "./restaurantSamples";
+import { cn, extractArea, extractCuisine } from "../lib/utils";
 
-/**
- * 맛집 작성 화면 (목록과 분리).
- *   /restaurants/new   → 새 맛집 등록
- *   /restaurants/:id   → 기존 맛집에 방문 메모 추가
- */
+const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
+
 export function RestaurantFormPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
   const editing = Boolean(id);
+  const locationState = location.state as
+    | {
+        restaurant?: Restaurant;
+        mapLocation?: { latitude: number; longitude: number };
+        selectedPlace?: KakaoPlace;
+      }
+    | null;
+  const mapLocation = locationState?.mapLocation;
+  const initialSelectedPlace = locationState?.selectedPlace ?? null;
 
-  // 메모 추가 모드일 때 대상 맛집 (목록에서 넘겨받거나 직접 진입 시 조회)
-  const [target, setTarget] = useState<Restaurant | null>(
-    (location.state as { restaurant?: Restaurant } | null)?.restaurant ?? null,
-  );
+  const [target, setTarget] = useState<Restaurant | null>(locationState?.restaurant ?? null);
 
-  // 폼 상태
   const [name, setName] = useState("");
   const [area, setArea] = useState("");
   const [cuisine, setCuisine] = useState("");
-  const [priceLevel, setPriceLevel] = useState("보통");
-  const [signatureMenus, setSignatureMenus] = useState("");
-  const [moodTags, setMoodTags] = useState("");
+  const [priceLevel, setPriceLevel] = useState(PRICE_OPTIONS[1]);
+  const [moodTags, setMoodTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
   const [note, setNote] = useState("");
 
-  // 카카오 검색
   const [kakaoQuery, setKakaoQuery] = useState("");
   const [kakaoPlaces, setKakaoPlaces] = useState<KakaoPlace[]>([]);
-  const [selectedPlace, setSelectedPlace] = useState<KakaoPlace | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<KakaoPlace | null>(initialSelectedPlace);
+  const [manualEntry, setManualEntry] = useState(editing || Boolean(mapLocation));
 
   const [saving, setSaving] = useState(false);
   const [placeLoading, setPlaceLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 직접 URL 진입 등으로 대상 정보가 없으면 목록에서 찾아온다.
   useEffect(() => {
-    if (!editing || target || !token) return;
-    listRestaurants(token)
-      .then((list) => setTarget(list.find((r) => r.id === id) ?? null))
-      .catch(() => {});
-  }, [editing, target, token, id]);
+    if (!editing || !token || !id) return;
+    if (target) {
+      hydrateFromRestaurant(target);
+      return;
+    }
+    getRestaurant(id, token)
+      .then((loaded) => {
+        setTarget(loaded);
+        hydrateFromRestaurant(loaded);
+      })
+      .catch((caught) => {
+        setError(caught instanceof Error ? caught.message : "맛집 정보를 불러오지 못했습니다.");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, token, id, target]);
 
-  function loadSample(index: number) {
-    const s = SAMPLES[index];
-    setName(s.name);
-    setArea(s.area);
-    setCuisine(s.cuisine);
-    setPriceLevel(s.price_level);
-    setSignatureMenus(s.signature_menus.join(","));
-    setMoodTags(s.mood_tags.join(","));
-    setNote(s.note);
+  useEffect(() => {
+    if (editing || !initialSelectedPlace) return;
+    hydrateFromPlace(initialSelectedPlace);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, initialSelectedPlace]);
+
+  function hydrateFromRestaurant(restaurant: Restaurant) {
+    setName(restaurant.name);
+    setArea(restaurant.area);
+    setCuisine(restaurant.cuisine);
+    setPriceLevel(restaurant.price_level);
+    setMoodTags(restaurant.mood_tags);
+    setManualEntry(true);
   }
 
   function selectPlace(place: KakaoPlace) {
     setSelectedPlace(place);
+    setManualEntry(false);
+    hydrateFromPlace(place);
+    setKakaoPlaces([]);
+    setKakaoQuery("");
+  }
+
+  function hydrateFromPlace(place: KakaoPlace) {
     setName(place.place_name);
     setArea(extractArea(place.address_name || place.road_address_name));
     setCuisine(extractCuisine(place.category_name));
-    setNote((cur) =>
-      cur.trim()
-        ? cur
-        : `${place.place_name}은 ${place.category_name || "음식점"} 카테고리의 장소입니다. 주소는 ${place.road_address_name || place.address_name}입니다.`,
+    setNote((current) =>
+      current.trim()
+        ? current
+        : `${place.place_name}에 다녀온 느낌, 분위기, 맛, 재방문 의사를 적어주세요.`,
     );
+  }
+
+  function startManualEntry() {
+    setManualEntry(true);
+    setSelectedPlace(null);
+    setKakaoPlaces([]);
+    setKakaoQuery("");
+    setName("");
+    setArea("");
+    setCuisine("");
+  }
+
+  function changePlace() {
+    setSelectedPlace(null);
+    setManualEntry(false);
+    setName("");
+    setArea("");
+    setCuisine("");
+  }
+
+  function addMoodTag(rawValue = tagInput) {
+    const normalized = rawValue.trim().replace(/^#+/, "");
+    if (!normalized) return;
+    setMoodTags((prev) => (prev.includes(normalized) ? prev : [...prev, normalized]));
+    setTagInput("");
+  }
+
+  function removeMoodTag(tag: string) {
+    setMoodTags((prev) => prev.filter((item) => item !== tag));
   }
 
   async function handleSearchKakao() {
@@ -85,8 +135,8 @@ export function RestaurantFormPage() {
     setPlaceLoading(true);
     setError(null);
     try {
-      const res = await searchKakaoPlaces(kakaoQuery.trim(), 5);
-      setKakaoPlaces(res.places);
+      const result = await searchKakaoPlaces(kakaoQuery.trim(), 5);
+      setKakaoPlaces(result.places);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "카카오 장소 검색에 실패했습니다.");
       setKakaoPlaces([]);
@@ -101,147 +151,228 @@ export function RestaurantFormPage() {
     setError(null);
     try {
       if (editing && id) {
-        await addRestaurantNote(id, { content: note, tags: splitCsv(moodTags) }, token);
-      } else {
-        await createRestaurant(
+        const updated = await updateRestaurant(
+          id,
           {
             name,
             area,
             cuisine,
             price_level: priceLevel,
-            mood_tags: splitCsv(moodTags),
-            signature_menus: splitCsv(signatureMenus),
-            note,
-            kakao_place_id: selectedPlace?.id ?? null,
-            kakao_place_url: selectedPlace?.place_url ?? "https://map.kakao.com",
-            address: selectedPlace?.address_name ?? null,
-            road_address: selectedPlace?.road_address_name ?? null,
-            phone: selectedPlace?.phone ?? null,
-            latitude: selectedPlace ? Number(selectedPlace.y) : null,
-            longitude: selectedPlace ? Number(selectedPlace.x) : null,
+            mood_tags: moodTags,
+            kakao_place_id: target?.kakao_place_id ?? null,
+            kakao_place_url: target?.kakao_place_url ?? null,
+            address: target?.address ?? null,
+            road_address: target?.road_address ?? null,
+            phone: target?.phone ?? null,
+            latitude: target?.latitude ?? null,
+            longitude: target?.longitude ?? null,
           },
           token,
         );
+        navigate(`/restaurants/${updated.id}`, { state: { restaurant: updated } });
+      } else {
+        const created = await createRestaurant(
+          {
+            name,
+            area,
+            cuisine,
+            price_level: priceLevel,
+            mood_tags: moodTags,
+            signature_menus: [],
+            note,
+            kakao_place_id: selectedPlace?.id ?? null,
+            kakao_place_url: selectedPlace?.place_url ?? null,
+            address: selectedPlace?.address_name ?? null,
+            road_address: selectedPlace?.road_address_name ?? null,
+            phone: selectedPlace?.phone ?? null,
+            latitude: selectedPlace ? Number(selectedPlace.y) : mapLocation?.latitude ?? null,
+            longitude: selectedPlace ? Number(selectedPlace.x) : mapLocation?.longitude ?? null,
+          },
+          token,
+        );
+        navigate(`/restaurants/${created.id}`, { state: { restaurant: created } });
       }
-      navigate("/restaurants");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "맛집 저장에 실패했습니다.");
       setSaving(false);
     }
   }
 
+  const canSave = editing ? name.trim() && area.trim() && cuisine.trim() : name.trim() && note.trim();
+
   return (
     <div className="tf-scroll h-full overflow-y-auto">
       <div className="flex flex-col gap-4 p-4">
-        {/* 뒤로 + 제목 */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/restaurants")} aria-label="목록으로">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(editing && id ? `/restaurants/${id}` : "/restaurants")}
+            aria-label="뒤로"
+          >
             <ArrowLeft size={18} />
           </Button>
           <div>
             <h2 className="text-sm font-semibold text-zinc-900">
-              {editing ? "방문 메모 추가" : "새 맛집 작성"}
+              {editing ? "맛집 수정" : "새 맛집 작성"}
             </h2>
             <p className="text-[11px] text-zinc-400">
               {editing
-                ? target
-                  ? `${target.name} · ${target.area} · ${target.cuisine}`
-                  : "선택한 맛집에 메모를 남겨요"
-                : "카카오 장소를 찾고 메모를 적어보세요"}
+                ? "식당명, 지역, 음식 종류, 가격대, 분위기 태그를 수정해요."
+                : "장소를 선택하거나 직접 입력한 뒤 가격대, 태그, 기록을 채워요."}
             </p>
           </div>
         </div>
 
         {!editing && (
           <>
-            {/* 카카오 검색 */}
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 p-3">
-              <div className="flex items-end gap-2">
-                <Field label="카카오 장소 검색" className="flex-1">
-                  <TextInput
-                    value={kakaoQuery}
-                    onChange={(e) => setKakaoQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void handleSearchKakao();
-                      }
-                    }}
-                    placeholder="예: 성수 파스타"
-                  />
-                </Field>
-                <Button variant="secondary" disabled={placeLoading} onClick={handleSearchKakao}>
-                  <Search size={15} />
-                  {placeLoading ? "검색 중" : "검색"}
-                </Button>
-              </div>
-              {kakaoPlaces.length > 0 && (
-                <div className="mt-2 space-y-1.5">
-                  {kakaoPlaces.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => selectPlace(p)}
-                      className={cn(
-                        "block w-full rounded-xl border p-2.5 text-left transition-colors",
-                        selectedPlace?.id === p.id
-                          ? "border-brand-300 bg-brand-50"
-                          : "border-zinc-200 bg-white hover:bg-zinc-50",
-                      )}
-                    >
-                      <strong className="block text-sm text-zinc-900">{p.place_name}</strong>
-                      <span className="text-[11px] text-zinc-500">{p.category_name}</span>
-                      <small className="block text-[11px] text-zinc-400">
-                        {p.road_address_name || p.address_name}
-                      </small>
-                    </button>
-                  ))}
+            {selectedPlace ? (
+              <div className="rounded-2xl border border-brand-300 bg-brand-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-semibold text-leaf-600">선택한 장소</span>
+                    <strong className="mt-1 block truncate text-sm text-zinc-900">
+                      {selectedPlace.place_name}
+                    </strong>
+                    <span className="text-[11px] text-zinc-500">{selectedPlace.category_name}</span>
+                    <small className="block truncate text-[11px] text-zinc-400">
+                      {selectedPlace.road_address_name || selectedPlace.address_name}
+                    </small>
+                  </div>
+                  <Button variant="secondary" size="sm" onClick={changePlace}>
+                    장소 변경
+                  </Button>
                 </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {SAMPLES.map((s, i) => (
-                <Button key={s.name} variant="secondary" size="sm" onClick={() => loadSample(i)}>
-                  <Leaf size={12} />
-                  샘플 {i + 1}
+              </div>
+            ) : manualEntry ? (
+              <ManualFields
+                name={name}
+                area={area}
+                cuisine={cuisine}
+                onNameChange={setName}
+                onAreaChange={setArea}
+                onCuisineChange={setCuisine}
+                onBack={changePlace}
+                showBack
+              />
+            ) : (
+              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 p-3">
+                <div className="flex items-end gap-2">
+                  <Field label="카카오 장소 검색" className="flex-1">
+                    <TextInput
+                      value={kakaoQuery}
+                      onChange={(event) => setKakaoQuery(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void handleSearchKakao();
+                        }
+                      }}
+                      placeholder="예: 성수 파스타"
+                    />
+                  </Field>
+                  <Button variant="secondary" disabled={placeLoading} onClick={handleSearchKakao}>
+                    <Search size={15} />
+                    {placeLoading ? "검색 중" : "검색"}
+                  </Button>
+                </div>
+                <Button className="mt-2 w-full" variant="ghost" size="sm" onClick={startManualEntry}>
+                  검색에 없으면 직접 입력
                 </Button>
-              ))}
-            </div>
-
-            <Field label="식당명">
-              <TextInput value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="지역">
-                <TextInput value={area} onChange={(e) => setArea(e.target.value)} />
-              </Field>
-              <Field label="음식 종류">
-                <TextInput value={cuisine} onChange={(e) => setCuisine(e.target.value)} />
-              </Field>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="가격대">
-                <TextInput value={priceLevel} onChange={(e) => setPriceLevel(e.target.value)} />
-              </Field>
-              <Field label="대표 메뉴 (쉼표)">
-                <TextInput value={signatureMenus} onChange={(e) => setSignatureMenus(e.target.value)} />
-              </Field>
-            </div>
+                {kakaoPlaces.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {kakaoPlaces.map((place) => (
+                      <button
+                        key={place.id}
+                        type="button"
+                        onClick={() => selectPlace(place)}
+                        className="block w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-left transition-colors hover:bg-zinc-50"
+                      >
+                        <strong className="block text-sm text-zinc-900">{place.place_name}</strong>
+                        <span className="text-[11px] text-zinc-500">{place.category_name}</span>
+                        <small className="block text-[11px] text-zinc-400">
+                          {place.road_address_name || place.address_name}
+                        </small>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 
-        <Field label="분위기 / 상황 태그 (쉼표)">
-          <TextInput value={moodTags} onChange={(e) => setMoodTags(e.target.value)} />
-        </Field>
-        <Field label="방문 메모 / 리뷰">
-          <TextArea
-            rows={5}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="조명, 좌석 간격, 분위기, 메뉴 추천 등 자세히 적을수록 좋아요"
+        {editing && (
+          <ManualFields
+            name={name}
+            area={area}
+            cuisine={cuisine}
+            onNameChange={setName}
+            onAreaChange={setArea}
+            onCuisineChange={setCuisine}
+            onBack={() => undefined}
           />
+        )}
+
+        {(selectedPlace || manualEntry || editing) && (
+          <Field label="가격대">
+            <ChipRow>
+              {PRICE_OPTIONS.map((option) => (
+                <ChoiceChip
+                  key={option}
+                  label={option}
+                  selected={priceLevel === option}
+                  onClick={() => setPriceLevel(option)}
+                />
+              ))}
+            </ChipRow>
+          </Field>
+        )}
+
+        <Field label="분위기 태그">
+          <div className="flex items-center gap-2">
+            <TextInput
+              value={tagInput}
+              onChange={(event) => setTagInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addMoodTag();
+                }
+              }}
+              placeholder="예: #조용한"
+            />
+            <Button variant="secondary" size="icon" onClick={() => addMoodTag()} aria-label="태그 추가">
+              <Plus size={16} />
+            </Button>
+          </div>
+          {moodTags.length > 0 && (
+            <ChipRow>
+              {moodTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => removeMoodTag(tag)}
+                  className="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-medium text-leaf-600"
+                >
+                  #{tag}
+                  <X size={12} />
+                </button>
+              ))}
+            </ChipRow>
+          )}
         </Field>
+
+        {!editing && (
+          <Field label="저장 기록">
+            <TextArea
+              rows={5}
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              placeholder="분위기, 좌석 간격, 맛, 재방문 의사처럼 나중에 추천 근거가 될 내용을 적어주세요."
+            />
+          </Field>
+        )}
 
         {error && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
@@ -249,15 +380,85 @@ export function RestaurantFormPage() {
           </div>
         )}
 
-        <Button
-          className="w-full"
-          disabled={saving || (!editing && !name.trim()) || (editing && !note.trim())}
-          onClick={handleSave}
-        >
-          <Store size={16} />
-          {saving ? "저장 중..." : editing ? "메모 추가" : "맛집 저장"}
+        <Button className="w-full" disabled={saving || !canSave} onClick={handleSave}>
+          {saving ? "저장 중..." : editing ? "저장" : "맛집 저장"}
         </Button>
       </div>
     </div>
+  );
+}
+
+function ManualFields({
+  name,
+  area,
+  cuisine,
+  onNameChange,
+  onAreaChange,
+  onCuisineChange,
+  onBack,
+  showBack = false,
+}: {
+  name: string;
+  area: string;
+  cuisine: string;
+  onNameChange: (value: string) => void;
+  onAreaChange: (value: string) => void;
+  onCuisineChange: (value: string) => void;
+  onBack: () => void;
+  showBack?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white p-3">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-xs font-semibold text-zinc-600">직접 입력</span>
+        {showBack && (
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label="카카오 검색으로 돌아가기">
+            <ArrowLeft size={16} />
+          </Button>
+        )}
+      </div>
+      <div className="space-y-3">
+        <Field label="식당명">
+          <TextInput value={name} onChange={(event) => onNameChange(event.target.value)} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="지역">
+            <TextInput value={area} onChange={(event) => onAreaChange(event.target.value)} />
+          </Field>
+          <Field label="음식 종류">
+            <TextInput value={cuisine} onChange={(event) => onCuisineChange(event.target.value)} />
+          </Field>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChipRow({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap gap-1.5">{children}</div>;
+}
+
+function ChoiceChip({
+  label,
+  selected,
+  onClick,
+}: {
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        selected
+          ? "border-brand-300 bg-brand-50 text-leaf-600"
+          : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
+      )}
+    >
+      {label}
+    </button>
   );
 }
