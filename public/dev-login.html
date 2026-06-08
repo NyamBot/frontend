@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8" /><title>dev login</title></head>
+  <body>
+    <script>
+      // 임시 dev 헬퍼: ?t=토큰&to=/경로 → localStorage 에 토큰 심고 해당 화면으로 이동.
+      const p = new URLSearchParams(location.search);
+      const t = p.get("t");
+      const to = p.get("to") || "/chat";
+      if (t) localStorage.setItem("nyambot_token", t);
+      location.replace(to);
+    </script>
+  </body>
+</html>
