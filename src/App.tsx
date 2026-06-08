@@ -4,8 +4,11 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { LoginPage } from "./pages/LoginPage";
 import { ChatPage } from "./pages/ChatPage";
 import { RestaurantsPage } from "./pages/RestaurantsPage";
+import { RestaurantMapPage } from "./pages/RestaurantMapPage";
 import { RestaurantFormPage } from "./pages/RestaurantFormPage";
+import { RestaurantDetailPage } from "./pages/RestaurantDetailPage";
 import { HistoryPage } from "./pages/HistoryPage";
+import { HistoryDetailPage } from "./pages/HistoryDetailPage";
 
 /**
  * 라우트 구조
@@ -30,9 +33,12 @@ export function App() {
         <Route index element={<Navigate to="/chat" replace />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/restaurants" element={<RestaurantsPage />} />
+        <Route path="/restaurants/map" element={<RestaurantMapPage />} />
         <Route path="/restaurants/new" element={<RestaurantFormPage />} />
-        <Route path="/restaurants/:id" element={<RestaurantFormPage />} />
+        <Route path="/restaurants/:id/edit" element={<RestaurantFormPage />} />
+        <Route path="/restaurants/:id" element={<RestaurantDetailPage />} />
         <Route path="/history" element={<HistoryPage />} />
+        <Route path="/history/:sessionId" element={<HistoryDetailPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

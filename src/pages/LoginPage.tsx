@@ -26,7 +26,7 @@ export function LoginPage() {
           제일 잘 알아요.
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-zinc-500">
-          다녀온 식당과 방문 메모를 쌓아두면
+          다녀온 식당과 기록을 쌓아두면
           <br />
           질문에 맞춰 근거 있는 맛집을 골라 드려요.
         </p>

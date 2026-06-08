@@ -55,11 +55,30 @@ export type RestaurantRecommendation = {
 
 export type TasteAgentMessage = {
   id: string;
+  session_id: string | null;
   user_id: string | null;
   role: "user" | "assistant";
   content: string;
   retrieved_context: string[];
+  metadata: {
+    area?: string | null;
+    cuisine?: string | null;
+    price_level?: string | null;
+    tags?: string[];
+    limit?: number;
+    recommendation_count?: number;
+    restaurant_names?: string[];
+  };
   created_at: string;
+};
+
+export type TasteAgentSession = {
+  id: string;
+  user_id: string | null;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: TasteAgentMessage[];
 };
 
 function authHeaders(token: string) {
@@ -152,6 +171,41 @@ export async function listRestaurants(token: string) {
   return response.json() as Promise<Restaurant[]>;
 }
 
+export async function getRestaurant(restaurantId: string, token: string) {
+  const response = await fetch(`${API_BASE}/api/restaurants/${encodeURIComponent(restaurantId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load restaurant"));
+  return response.json() as Promise<Restaurant>;
+}
+
+export async function updateRestaurant(
+  restaurantId: string,
+  payload: {
+    name: string;
+    area: string;
+    cuisine: string;
+    price_level: string;
+    mood_tags: string[];
+    kakao_place_id?: string | null;
+    kakao_place_url?: string | null;
+    address?: string | null;
+    road_address?: string | null;
+    phone?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  },
+  token: string,
+) {
+  const response = await fetch(`${API_BASE}/api/restaurants/${encodeURIComponent(restaurantId)}`, {
+    method: "PUT",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to update restaurant"));
+  return response.json() as Promise<Restaurant>;
+}
+
 export async function addRestaurantNote(
   restaurantId: string,
   payload: {
@@ -169,6 +223,14 @@ export async function addRestaurantNote(
   return response.json() as Promise<Restaurant>;
 }
 
+export async function deleteRestaurant(restaurantId: string, token: string) {
+  const response = await fetch(`${API_BASE}/api/restaurants/${encodeURIComponent(restaurantId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to delete restaurant"));
+}
+
 export async function searchKakaoPlaces(query: string, size = 5) {
   const params = new URLSearchParams({ query, size: String(size) });
   const response = await fetch(`${API_BASE}/api/restaurants/kakao/search?${params.toString()}`);
@@ -178,12 +240,15 @@ export async function searchKakaoPlaces(query: string, size = 5) {
 
 export async function chatTasteAgent(payload: {
   user_id?: string | null;
+  session_id?: string | null;
   query: string;
   message: string;
   area?: string | null;
   cuisine?: string | null;
   price_level?: string | null;
   tags: string[];
+  latitude?: number | null;
+  longitude?: number | null;
   limit?: number;
 }, token: string) {
   const response = await fetch(`${API_BASE}/api/restaurants/chat`, {
@@ -193,6 +258,7 @@ export async function chatTasteAgent(payload: {
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to ask taste agent"));
   return response.json() as Promise<{
+    session_id: string;
     answer: string;
     recommendations: RestaurantRecommendation[];
     context: string[];
@@ -205,4 +271,12 @@ export async function listTasteAgentMessages(token: string) {
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to list taste agent messages"));
   return response.json() as Promise<{ user_id: string | null; messages: TasteAgentMessage[] }>;
+}
+
+export async function listTasteAgentSessions(token: string) {
+  const response = await fetch(`${API_BASE}/api/restaurants/chat/sessions`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to list taste agent sessions"));
+  return response.json() as Promise<{ user_id: string | null; sessions: TasteAgentSession[] }>;
 }
