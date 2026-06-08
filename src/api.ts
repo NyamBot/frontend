@@ -32,6 +32,9 @@ export type ClipIdea = {
 };
 
 export type ScriptPack = {
+  id?: string | null;
+  source_id?: string | null;
+  clip_idea_id?: string | null;
   title: string;
   hook: string;
   scene_plan: string[];
@@ -40,6 +43,16 @@ export type ScriptPack = {
   audio_direction: string[];
   hashtags: string[];
   license_checklist: string[];
+  created_at?: string | null;
+};
+
+export type AgentMessage = {
+  id: string;
+  source_id: string;
+  role: "user" | "assistant";
+  content: string;
+  retrieved_context: string[];
+  created_at: string;
 };
 
 export async function createSource(payload: {
@@ -82,7 +95,13 @@ export async function createUser(payload: {
   return response.json() as Promise<User>;
 }
 
-export async function generateIdeas(sourceId: string, title: string, platform: string) {
+export async function generateIdeas(
+  sourceId: string,
+  title: string,
+  platform: string,
+  audience: string,
+  goal: string,
+) {
   const response = await fetch(`${API_BASE}/api/clips/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -90,8 +109,8 @@ export async function generateIdeas(sourceId: string, title: string, platform: s
       source_id: sourceId,
       title,
       platform,
-      audience: "general creators",
-      goal: "awareness",
+      audience,
+      goal,
       count: 3,
     }),
   });
@@ -107,4 +126,20 @@ export async function generateScript(sourceId: string, idea: ClipIdea) {
   });
   if (!response.ok) throw new Error("Failed to generate script");
   return response.json() as Promise<ScriptPack>;
+}
+
+export async function chatAgent(sourceId: string, message: string) {
+  const response = await fetch(`${API_BASE}/api/agent/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source_id: sourceId, message }),
+  });
+  if (!response.ok) throw new Error("Failed to ask agent");
+  return response.json() as Promise<{ answer: string; context: string[] }>;
+}
+
+export async function listAgentMessages(sourceId: string) {
+  const response = await fetch(`${API_BASE}/api/agent/messages?source_id=${encodeURIComponent(sourceId)}`);
+  if (!response.ok) throw new Error("Failed to list agent messages");
+  return response.json() as Promise<{ source_id: string; messages: AgentMessage[] }>;
 }
