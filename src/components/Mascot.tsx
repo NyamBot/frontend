@@ -58,24 +58,18 @@ export function MiniMascot({ className }: { className?: string }) {
       aria-hidden="true"
     >
       <ellipse cx="40" cy="74" rx="22" ry="3" fill="rgba(46,77,24,0.15)" />
-      <path
-        d="M40 18 C 33 8 47 4 52 9 C 54 17 47 22 40 20 Z"
-        fill="#b6df80"
-        stroke="#2f4d18"
-        strokeWidth="1.6"
-      />
-      <ellipse cx="40" cy="46" rx="28" ry="24" fill="#ffd84d" stroke="#2a2d1b" strokeWidth="2" />
+      {/* 작은 머리가닥 3개 */}
+      <path d="M37 21 Q 34 14 38 12" stroke="#f4c01f" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+      <path d="M40 21 Q 40 13 40 11" stroke="#f4c01f" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+      <path d="M43 21 Q 46 14 42 12" stroke="#f4c01f" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+      <ellipse cx="40" cy="46" rx="28" ry="24" fill="#ffd84d" stroke="#e0a01a" strokeWidth="1.6" />
       <ellipse cx="30" cy="46" rx="2.6" ry="3.4" fill="#2a2d1b" />
       <ellipse cx="50" cy="46" rx="2.6" ry="3.4" fill="#2a2d1b" />
-      <path
-        d="M34 54 Q 40 60 46 54"
-        stroke="#2a2d1b"
-        strokeWidth="1.8"
-        fill="none"
-        strokeLinecap="round"
-      />
-      <ellipse cx="24" cy="54" rx="3" ry="1.8" fill="#ffb48a" opacity="0.8" />
-      <ellipse cx="56" cy="54" rx="3" ry="1.8" fill="#ffb48a" opacity="0.8" />
+      {/* 부리 — 가로로 길게 (아따맘마 입술 느낌) */}
+      <path d="M32 52 L48 52 L40 49 Z" fill="#ffae2b" />
+      <path d="M32 52 L48 52 L40 55 Z" fill="#ef9018" />
+      <ellipse cx="22" cy="54" rx="3" ry="1.8" fill="#ffb48a" opacity="0.8" />
+      <ellipse cx="58" cy="54" rx="3" ry="1.8" fill="#ffb48a" opacity="0.8" />
     </svg>
   );
 }
