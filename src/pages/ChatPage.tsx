@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Compass, Crosshair, RefreshCw, Send, SlidersHorizontal, Sparkles, SquarePen } from "lucide-react";
+import { useLocation as useRouteLocation } from "react-router-dom";
+import { AlertTriangle, MapPin, MapPinOff, RefreshCw, Send, SlidersHorizontal, Sparkles, SquarePen } from "lucide-react";
 import {
   chatTasteAgent,
+  listTasteAgentSessions,
   type RestaurantRecommendation,
   type TasteAgentMessage,
+  type TasteAgentSession,
 } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
+import { RecommendationMessage } from "../components/RecommendationCards";
 import { Button, TextInput } from "../components/ui";
 import { cn } from "../lib/utils";
 
@@ -18,9 +22,11 @@ const QUICK_QUERIES = [
 
 const CUISINE_OPTIONS = ["한식", "일식", "중식", "양식", "분식", "카페", "술집"];
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
+const ACTIVE_CHAT_SESSION_KEY = "nyambot.activeChatSessionId";
 
 export function ChatPage() {
   const { token } = useAuth();
+  const location = useRouteLocation();
   const [messages, setMessages] = useState<TasteAgentMessage[]>([]);
   const [recommendations, setRecommendations] = useState<RestaurantRecommendation[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -35,16 +41,50 @@ export function ChatPage() {
   const [error, setError] = useState<string | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
-  const locationEnabledRef = useRef(useLocation);
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, recommendations, loading]);
 
   useEffect(() => {
-    if (useLocation) requestCurrentLocation();
-    locationEnabledRef.current = useLocation;
-  }, [useLocation]);
+    requestCurrentLocation();
+  }, []);
+
+  useEffect(() => {
+    const routeSession = (location.state as { session?: TasteAgentSession } | null)?.session ?? null;
+    if (routeSession) {
+      activateSession(routeSession);
+      return;
+    }
+    void restoreActiveSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, location.state]);
+
+  function activateSession(session: TasteAgentSession) {
+    window.localStorage.setItem(ACTIVE_CHAT_SESSION_KEY, session.id);
+    setSessionId(session.id);
+    setMessages(session.messages);
+    setRecommendations([]);
+    setError(null);
+  }
+
+  async function restoreActiveSession() {
+    if (!token || messages.length > 0) return;
+    const activeSessionId = window.localStorage.getItem(ACTIVE_CHAT_SESSION_KEY);
+    if (!activeSessionId) return;
+
+    try {
+      const data = await listTasteAgentSessions(token);
+      const activeSession = data.sessions.find((session) => session.id === activeSessionId);
+      if (!activeSession) {
+        window.localStorage.removeItem(ACTIVE_CHAT_SESSION_KEY);
+        return;
+      }
+      activateSession(activeSession);
+    } catch {
+      // 채팅 복원 실패는 새 질문 흐름을 막지 않는다.
+    }
+  }
 
   function requestCurrentLocation() {
     if (!window.isSecureContext || !navigator.geolocation) {
@@ -55,7 +95,6 @@ export function ChatPage() {
     setLocationStatus("loading");
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        if (!locationEnabledRef.current) return;
         setCurrentLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -63,7 +102,6 @@ export function ChatPage() {
         setLocationStatus("ready");
       },
       () => {
-        if (!locationEnabledRef.current) return;
         setCurrentLocation(null);
         setLocationStatus("failed");
       },
@@ -72,6 +110,7 @@ export function ChatPage() {
   }
 
   function clearChat() {
+    window.localStorage.removeItem(ACTIVE_CHAT_SESSION_KEY);
     setSessionId(null);
     setMessages([]);
     setRecommendations([]);
@@ -123,6 +162,7 @@ export function ChatPage() {
         token,
       );
       setSessionId(response.session_id);
+      window.localStorage.setItem(ACTIVE_CHAT_SESSION_KEY, response.session_id);
       setMessages((prev) => [
         ...prev,
         {
@@ -135,6 +175,7 @@ export function ChatPage() {
           metadata: {
             recommendation_count: response.recommendations.length,
             restaurant_names: response.recommendations.map((recommendation) => recommendation.restaurant.name),
+            recommendations: response.recommendations,
           },
           created_at: new Date().toISOString(),
         },
@@ -154,20 +195,71 @@ export function ChatPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-4 pt-3">
-        <button
-          type="button"
-          onClick={() => setShowFilters((value) => !value)}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-            showFilters
-              ? "border-brand-300 bg-brand-50 text-leaf-600"
-              : "border-zinc-200 text-zinc-500 hover:bg-zinc-50",
-          )}
-        >
-          <SlidersHorizontal size={13} />
-          검색 조건
-        </button>
+      <div className="flex items-center justify-between gap-2 px-4 pt-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowFilters((value) => !value)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+              showFilters
+                ? "border-brand-300 bg-brand-50 text-leaf-600"
+                : "border-zinc-200 text-zinc-500 hover:bg-zinc-50",
+            )}
+          >
+            <SlidersHorizontal size={13} />
+            검색 조건
+          </button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={useLocation}
+            aria-label="위치 반영"
+            onClick={() => {
+              if (useLocation && locationStatus === "failed") {
+                requestCurrentLocation();
+                return;
+              }
+              const next = !useLocation;
+              setUseLocation(next);
+              if (next) {
+                requestCurrentLocation();
+              } else {
+                setCurrentLocation(null);
+                setLocationStatus("idle");
+              }
+            }}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+              !useLocation
+                ? "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
+                : locationStatus === "ready"
+                  ? "bg-brand-50 text-leaf-600 hover:bg-brand-100"
+                  : locationStatus === "failed"
+                    ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
+                    : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200",
+            )}
+          >
+            {!useLocation ? (
+              <MapPinOff size={12} />
+            ) : locationStatus === "loading" ? (
+              <RefreshCw size={11} className="animate-spin" />
+            ) : locationStatus === "failed" ? (
+              <AlertTriangle size={12} />
+            ) : (
+              <MapPin size={12} />
+            )}
+            {!useLocation
+              ? "위치 꺼짐"
+              : locationStatus === "ready"
+                ? "위치 반영중"
+                : locationStatus === "loading"
+                  ? "위치 확인중"
+                  : locationStatus === "failed"
+                    ? "위치 안 잡힘"
+                    : "위치 대기중"}
+          </button>
+        </div>
         <Button
           variant="ghost"
           size="sm"
@@ -178,74 +270,6 @@ export function ChatPage() {
           <SquarePen size={14} />
           새 대화
         </Button>
-      </div>
-
-      <div className="mx-4 mt-2 flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-3 py-2">
-        <span
-          className={cn(
-            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
-            useLocation && locationStatus === "ready" ? "bg-brand-50 text-leaf-600" : "bg-zinc-50 text-zinc-400",
-          )}
-        >
-          {locationStatus === "loading" ? <RefreshCw size={14} className="animate-spin" /> : <Crosshair size={14} />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold text-zinc-700">위치 반영</div>
-          <div className="truncate text-[11px] text-zinc-400">
-            {!useLocation
-              ? "저장 기록만 보고 추천해요."
-              : locationStatus === "ready"
-                ? "현재 위치를 추천에 반영해요."
-                : locationStatus === "loading"
-                  ? "위치를 빠르게 확인하는 중이에요."
-                  : "위치 없이도 추천할 수 있어요."}
-          </div>
-        </div>
-        {useLocation && locationStatus === "failed" && (
-          <button
-            type="button"
-            onClick={requestCurrentLocation}
-            className="inline-flex h-8 shrink-0 items-center rounded-xl bg-zinc-50 px-2.5 text-xs font-medium text-zinc-500 hover:bg-zinc-100"
-          >
-            재시도
-          </button>
-        )}
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            role="switch"
-            aria-checked={useLocation}
-            aria-label="위치 반영"
-            onClick={() => {
-              const next = !useLocation;
-              locationEnabledRef.current = next;
-              setUseLocation(next);
-              if (!next) {
-                setCurrentLocation(null);
-                setLocationStatus("idle");
-              }
-            }}
-            className={cn(
-              "relative h-7 w-12 rounded-full transition-colors",
-              useLocation ? "bg-leaf-500" : "bg-zinc-200",
-            )}
-          >
-            <span
-              className={cn(
-                "absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
-                useLocation ? "translate-x-5" : "translate-x-0",
-              )}
-            />
-          </button>
-          <span
-            className={cn(
-              "w-7 text-right text-[11px] font-bold",
-              useLocation ? "text-leaf-600" : "text-zinc-400",
-            )}
-          >
-            {useLocation ? "ON" : "OFF"}
-          </span>
-        </div>
       </div>
 
       {showFilters && (
@@ -457,88 +481,5 @@ function TypingIndicator() {
       </style>
     </div>
   );
-}
-
-function RecommendationMessage({ recommendations }: { recommendations: RestaurantRecommendation[] }) {
-  return (
-    <div className="flex w-full">
-      <div className="flex max-w-[88%] gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-          <MiniMascot className="h-8 w-8" />
-        </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <span className="text-[11px] font-medium text-zinc-400">NyamBot</span>
-          <div className="space-y-4 rounded-2xl bg-zinc-100 px-3.5 py-3">
-            {recommendations.map((recommendation, index) => (
-              <RecommendationCard key={recommendation.restaurant.id} rec={recommendation} rank={index + 1} />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RecommendationCard({ rec, rank }: { rec: RestaurantRecommendation; rank: number }) {
-  const restaurant = rec.restaurant;
-  const description = buildRecommendationDescription(rec);
-  const metaParts = [restaurant.area, restaurant.cuisine, restaurant.price_level].filter(Boolean);
-
-  return (
-    <div className="space-y-2">
-      <article className="rounded-2xl border border-zinc-200 bg-white p-3.5 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <strong className="block truncate text-sm font-semibold text-zinc-900">{restaurant.name}</strong>
-            <span className="text-xs text-zinc-500">
-              {metaParts.join(" · ")}
-            </span>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-leaf-600">
-            <Sparkles size={11} />
-            {rank}순위
-          </span>
-        </div>
-      </article>
-
-      <p className="rounded-2xl bg-white px-3.5 py-2.5 text-sm leading-relaxed text-zinc-800">
-        {description}
-      </p>
-
-      {restaurant.kakao_place_url && (
-        <div className="flex justify-end">
-          <a
-            href={restaurant.kakao_place_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-medium text-leaf-500 hover:text-leaf-600"
-          >
-            <Compass size={12} />
-            카카오맵으로 바로가기
-          </a>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function buildRecommendationDescription(rec: RestaurantRecommendation) {
-  const evidence = rec.evidence[0]?.trim();
-  const caution = rec.caution?.trim();
-  const isExternalCandidate = rec.restaurant.id.startsWith("kakao-") || rec.restaurant.note_count === 0;
-  const parts = [];
-
-  if (evidence) {
-    const cleanEvidence = evidence.replace(/[.!?。！？]+$/, "");
-    parts.push(isExternalCandidate ? cleanEvidence : `${cleanEvidence}라는 기록이 있어.`);
-  } else {
-    parts.push(rec.reason.replace(/[.!?。！？]+$/, ""));
-  }
-
-  if (caution && !isExternalCandidate) {
-    parts.push(caution.replace(/[.!?。！？]+$/, ""));
-  }
-
-  return parts.join(" ");
 }
 

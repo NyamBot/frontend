@@ -20,6 +20,9 @@ export type Restaurant = {
   user_id: string | null;
   name: string;
   area: string;
+  city: string | null;
+  district: string | null;
+  town: string | null;
   cuisine: string;
   price_level: string;
   mood_tags: string[];
@@ -71,6 +74,7 @@ export type TasteAgentMessage = {
     limit?: number;
     recommendation_count?: number;
     restaurant_names?: string[];
+    recommendations?: RestaurantRecommendation[];
   };
   created_at: string;
 };
@@ -144,6 +148,9 @@ export async function createUser(payload: {
 export async function createRestaurant(payload: {
   name: string;
   area: string;
+  city?: string | null;
+  district?: string | null;
+  town?: string | null;
   cuisine: string;
   price_level: string;
   mood_tags: string[];
@@ -195,6 +202,9 @@ export async function updateRestaurant(
   payload: {
     name: string;
     area: string;
+    city?: string | null;
+    district?: string | null;
+    town?: string | null;
     cuisine: string;
     price_level: string;
     mood_tags: string[];

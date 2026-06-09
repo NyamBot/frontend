@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Search, X } from "lucide-react";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { Button, Field, TextArea, TextInput } from "../components/ui";
+import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
 import { cn, extractArea, extractCuisine } from "../lib/utils";
 
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
@@ -35,6 +36,8 @@ export function RestaurantFormPage() {
 
   const [name, setName] = useState("");
   const [area, setArea] = useState("");
+  const [regionCity, setRegionCity] = useState("");
+  const [regionDistrict, setRegionDistrict] = useState("");
   const [cuisine, setCuisine] = useState("");
   const [priceLevel, setPriceLevel] = useState(PRICE_OPTIONS[1]);
   const [moodTags, setMoodTags] = useState<string[]>([]);
@@ -74,8 +77,11 @@ export function RestaurantFormPage() {
   }, [editing, initialSelectedPlace]);
 
   function hydrateFromRestaurant(restaurant: Restaurant) {
+    const region = parseRegionParts(restaurant.road_address || restaurant.address || restaurant.area);
     setName(restaurant.name);
-    setArea(restaurant.area);
+    setRegionCity(region.city);
+    setRegionDistrict(region.district);
+    setArea(region.area || restaurant.area);
     setCuisine(restaurant.cuisine);
     setPriceLevel(restaurant.price_level);
     setMoodTags(restaurant.mood_tags);
@@ -91,8 +97,11 @@ export function RestaurantFormPage() {
   }
 
   function hydrateFromPlace(place: KakaoPlace) {
+    const region = parseRegionParts(place.road_address_name || place.address_name);
     setName(place.place_name);
-    setArea(extractArea(place.address_name || place.road_address_name));
+    setRegionCity(region.city);
+    setRegionDistrict(region.district);
+    setArea(region.area || extractArea(place.address_name || place.road_address_name));
     setCuisine(extractCuisine(place.category_name));
     setNote((current) =>
       current.trim()
@@ -108,6 +117,8 @@ export function RestaurantFormPage() {
     setKakaoQuery("");
     setName("");
     setArea("");
+    setRegionCity("");
+    setRegionDistrict("");
     setCuisine("");
   }
 
@@ -116,7 +127,15 @@ export function RestaurantFormPage() {
     setManualEntry(false);
     setName("");
     setArea("");
+    setRegionCity("");
+    setRegionDistrict("");
     setCuisine("");
+  }
+
+  function updateRegion(nextCity: string, nextDistrict = "") {
+    setRegionCity(nextCity);
+    setRegionDistrict(nextDistrict);
+    setArea(buildRegionArea(nextCity, nextDistrict));
   }
 
   function addMoodTag(rawValue = tagInput) {
@@ -156,6 +175,9 @@ export function RestaurantFormPage() {
           {
             name,
             area,
+            city: regionCity || null,
+            district: regionDistrict || null,
+            town: null,
             cuisine,
             price_level: priceLevel,
             mood_tags: moodTags,
@@ -175,6 +197,9 @@ export function RestaurantFormPage() {
           {
             name,
             area,
+            city: regionCity || null,
+            district: regionDistrict || null,
+            town: null,
             cuisine,
             price_level: priceLevel,
             mood_tags: moodTags,
@@ -248,9 +273,12 @@ export function RestaurantFormPage() {
               <ManualFields
                 name={name}
                 area={area}
+                regionCity={regionCity}
+                regionDistrict={regionDistrict}
                 cuisine={cuisine}
                 onNameChange={setName}
                 onAreaChange={setArea}
+                onRegionChange={updateRegion}
                 onCuisineChange={setCuisine}
                 onBack={changePlace}
                 showBack
@@ -306,9 +334,12 @@ export function RestaurantFormPage() {
           <ManualFields
             name={name}
             area={area}
+            regionCity={regionCity}
+            regionDistrict={regionDistrict}
             cuisine={cuisine}
             onNameChange={setName}
             onAreaChange={setArea}
+            onRegionChange={updateRegion}
             onCuisineChange={setCuisine}
             onBack={() => undefined}
           />
@@ -391,22 +422,33 @@ export function RestaurantFormPage() {
 function ManualFields({
   name,
   area,
+  regionCity,
+  regionDistrict,
   cuisine,
   onNameChange,
   onAreaChange,
+  onRegionChange,
   onCuisineChange,
   onBack,
   showBack = false,
 }: {
   name: string;
   area: string;
+  regionCity: string;
+  regionDistrict: string;
   cuisine: string;
   onNameChange: (value: string) => void;
   onAreaChange: (value: string) => void;
+  onRegionChange: (city: string, district?: string) => void;
   onCuisineChange: (value: string) => void;
   onBack: () => void;
   showBack?: boolean;
 }) {
+  const districtOptions = useMemo(
+    () => (regionCity ? DISTRICT_OPTIONS_BY_CITY[regionCity] ?? [] : []),
+    [regionCity],
+  );
+
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-3">
       <div className="mb-3 flex items-center justify-between">
@@ -421,9 +463,32 @@ function ManualFields({
         <Field label="식당명">
           <TextInput value={name} onChange={(event) => onNameChange(event.target.value)} />
         </Field>
+        <Field label="지역 선택">
+          <div className="grid grid-cols-2 gap-2">
+            <RegionSelect
+              ariaLabel="시 선택"
+              placeholder="시"
+              options={CITY_OPTIONS}
+              value={regionCity}
+              onChange={(value) => onRegionChange(value)}
+            />
+            <RegionSelect
+              ariaLabel="군·구 선택"
+              placeholder="군·구"
+              options={districtOptions}
+              value={regionDistrict}
+              disabled={!regionCity || districtOptions.length === 0}
+              onChange={(value) => onRegionChange(regionCity, value)}
+            />
+          </div>
+        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="지역">
-            <TextInput value={area} onChange={(event) => onAreaChange(event.target.value)} />
+          <Field label="저장 지역명">
+            <TextInput
+              value={area}
+              onChange={(event) => onAreaChange(event.target.value)}
+              placeholder="예: 서울특별시 성동구 성수동1가"
+            />
           </Field>
           <Field label="음식 종류">
             <TextInput value={cuisine} onChange={(event) => onCuisineChange(event.target.value)} />
@@ -431,6 +496,42 @@ function ManualFields({
         </div>
       </div>
     </div>
+  );
+}
+
+function RegionSelect({
+  ariaLabel,
+  placeholder,
+  options,
+  value,
+  onChange,
+  disabled,
+}: {
+  ariaLabel: string;
+  placeholder: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <select
+      aria-label={ariaLabel}
+      value={value}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value)}
+      className={cn(
+        "min-w-0 rounded-xl border border-zinc-200 bg-white px-2 py-2 text-xs font-medium outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-200 disabled:bg-zinc-50 disabled:text-zinc-300",
+        value ? "text-zinc-800" : "text-zinc-400",
+      )}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((option) => (
+        <option key={option} value={option} className="text-zinc-800">
+          {option}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -461,4 +562,42 @@ function ChoiceChip({
       {label}
     </button>
   );
+}
+
+function parseRegionParts(source: string) {
+  const parts = source.split(" ").filter(Boolean);
+  const city = normalizeCity(parts[0] ?? "");
+  const district = parts[1] ?? "";
+  return {
+    city,
+    district,
+    area: buildRegionArea(city, district),
+  };
+}
+
+function normalizeCity(value: string) {
+  const aliases: Record<string, string> = {
+    강원: "강원특별자치도",
+    경기: "경기도",
+    경남: "경상남도",
+    경북: "경상북도",
+    광주: "광주광역시",
+    대구: "대구광역시",
+    대전: "대전광역시",
+    부산: "부산광역시",
+    서울: "서울특별시",
+    세종: "세종특별자치시",
+    울산: "울산광역시",
+    인천: "인천광역시",
+    전남: "전라남도",
+    전북: "전북특별자치도",
+    제주: "제주특별자치도",
+    충남: "충청남도",
+    충북: "충청북도",
+  };
+  return aliases[value] ?? value;
+}
+
+function buildRegionArea(city: string, district = "") {
+  return [city, district].filter(Boolean).join(" ");
 }

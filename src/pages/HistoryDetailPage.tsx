@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageCircle } from "lucide-react";
 import { listTasteAgentSessions, type TasteAgentMessage, type TasteAgentSession } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
+import { RecommendationMessage } from "../components/RecommendationCards";
 import { Button } from "../components/ui";
 import { cn } from "../lib/utils";
 
@@ -49,15 +50,29 @@ export function HistoryDetailPage() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/history")} aria-label="기록 목록으로">
           <ArrowLeft size={18} />
         </Button>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold text-zinc-900">{session.title}</h2>
           <p className="text-[11px] text-zinc-400">{formatDate(session.updated_at)}</p>
         </div>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => navigate("/chat", { state: { session } })}
+          disabled={!session.messages.length}
+        >
+          <MessageCircle size={14} />
+          이어서 대화
+        </Button>
       </div>
 
       <div className="tf-scroll flex-1 space-y-5 overflow-y-auto px-4 py-5">
         {session.messages.map((message) => (
-          <HistoryBubble key={message.id} message={message} />
+          <div key={message.id} className="space-y-3">
+            <HistoryBubble message={message} />
+            {message.role === "assistant" && message.metadata.recommendations?.length ? (
+              <RecommendationMessage recommendations={message.metadata.recommendations} />
+            ) : null}
+          </div>
         ))}
         {!session.messages.length && (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
@@ -74,15 +89,22 @@ function HistoryBubble({ message }: { message: TasteAgentMessage }) {
   const isUser = message.role === "user";
   return (
     <div className={cn("flex w-full", isUser && "justify-end")}>
-      <div className={cn("max-w-[88%] space-y-1", isUser && "text-right")}>
-        <span className="text-[11px] font-medium text-zinc-400">{isUser ? "나" : "NyamBot"}</span>
-        <div
-          className={cn(
-            "whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
-            isUser ? "bg-brand-300 text-leaf-600" : "bg-zinc-100 text-zinc-800",
-          )}
-        >
-          {message.content}
+      <div className={cn("flex max-w-[88%] gap-2.5", isUser && "flex-row-reverse")}>
+        {!isUser && (
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center">
+            <MiniMascot className="h-8 w-8" />
+          </div>
+        )}
+        <div className={cn("min-w-0 space-y-1", isUser && "text-right")}>
+          <span className="text-[11px] font-medium text-zinc-400">{isUser ? "나" : "NyamBot"}</span>
+          <div
+            className={cn(
+              "whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
+              isUser ? "bg-brand-300 text-leaf-600" : "bg-zinc-100 text-zinc-800",
+            )}
+          >
+            {message.content}
+          </div>
         </div>
       </div>
     </div>
