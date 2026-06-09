@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, Clock3, RefreshCw } from "lucide-react";
+import { ChevronRight, RefreshCw } from "lucide-react";
 import { listTasteAgentSessions, type TasteAgentSession } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
-import { Button, Card } from "../components/ui";
 
 export function HistoryPage() {
   const { token } = useAuth();
@@ -30,79 +29,73 @@ export function HistoryPage() {
 
   return (
     <div className="tf-scroll h-full overflow-y-auto">
-      <div className="p-4">
-        <Card className="overflow-hidden">
-          <header className="flex items-center gap-3 border-b border-zinc-100 px-5 py-4">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-leaf-50 text-leaf-600">
-              <Clock3 size={18} />
-            </span>
-            <div className="flex-1">
-              <h2 className="text-sm font-semibold text-zinc-900">대화 기록</h2>
-              <p className="text-xs text-zinc-400">대화 세션을 선택해서 다시 확인해요.</p>
-            </div>
-            <Button variant="ghost" size="icon" onClick={refresh} aria-label="새로고침">
-              <RefreshCw size={15} />
-            </Button>
-          </header>
+      <div className="space-y-3 p-4">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs font-medium text-zinc-500">대화 {sessions.length}개</span>
+          <button
+            type="button"
+            onClick={refresh}
+            className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600"
+          >
+            <RefreshCw size={13} />
+            새로고침
+          </button>
+        </div>
 
-          {error && (
-            <div className="m-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
-              {error}
-            </div>
-          )}
-
-          <div className="divide-y divide-zinc-100">
-            {sessions.map((session) => {
-              const questions = session.messages.filter((message) => message.role === "user");
-              const firstQuestion = questions[0]?.content ?? session.title;
-
-              return (
-                <button
-                  key={session.id}
-                  type="button"
-                  onClick={() => navigate(`/history/${session.id}`, { state: { session } })}
-                  className="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-zinc-50"
-                >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-xs font-bold text-leaf-600">
-                    {questions.length}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 text-sm font-semibold leading-relaxed text-zinc-900">
-                      {firstQuestion}
-                    </span>
-                    <span className="mt-1 block text-[11px] text-zinc-400">
-                      {questions.length}개 질문 · {formatDate(session.updated_at)}
-                    </span>
-                  </span>
-                  <ChevronRight size={18} className="shrink-0 text-zinc-300" />
-                </button>
-              );
-            })}
-
-            {!sessions.length && !error && (
-              <div className="flex flex-col items-center gap-3 py-12 text-center">
-                <MiniMascot className="h-14 w-14" />
-                <span className="text-sm text-zinc-400">
-                  아직 대화 기록이 없어요.
-                  <br />
-                  먼저 채팅에서 질문해볼까요?
-                </span>
-              </div>
-            )}
+        {error && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
+            {error}
           </div>
-        </Card>
+        )}
+
+        {sessions.length > 0 && (
+          <div className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
+            {sessions.map((session) => (
+              <button
+                key={session.id}
+                type="button"
+                onClick={() => navigate(`/history/${session.id}`, { state: { session } })}
+                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-zinc-50"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="line-clamp-1 text-sm font-medium text-zinc-900">
+                    {getSessionTitle(session)}
+                  </div>
+                  <div className="mt-0.5 text-[11px] text-zinc-400">{formatDate(session.updated_at)}</div>
+                </div>
+                <ChevronRight size={16} className="shrink-0 text-zinc-300" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!sessions.length && !error && (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <MiniMascot className="h-14 w-14" />
+            <span className="text-sm text-zinc-400">
+              아직 대화 기록이 없어요.
+              <br />
+              먼저 채팅에서 질문해볼까요?
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+function getSessionTitle(session: TasteAgentSession) {
+  const title = session.title?.trim();
+  if (title) return title;
+  const firstQuestion = session.messages.find((message) => message.role === "user")?.content;
+  return firstQuestion ?? "새 대화";
 }
 
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("ko-KR", {
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
+    month: "long",
+    day: "numeric",
   }).format(date);
 }

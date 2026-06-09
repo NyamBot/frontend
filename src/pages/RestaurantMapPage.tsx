@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Crosshair, ExternalLink, MapPin, Star } from "lucide-react";
+import { Crosshair, ExternalLink, MapPin, RefreshCw, X } from "lucide-react";
 import { listRestaurants, type Restaurant } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { RestaurantMap } from "../components/RestaurantMap";
 import { Button, Tag } from "../components/ui";
 import { getKakaoDirectionUrl } from "../lib/kakaoMap";
+import { cn } from "../lib/utils";
 
 export function RestaurantMapPage() {
   const { token } = useAuth();
@@ -14,7 +15,6 @@ export function RestaurantMapPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "ready" | "failed">("idle");
-  const [locationMessage, setLocationMessage] = useState("현재 위치를 확인하는 중이에요.");
   const [error, setError] = useState<string | null>(null);
 
   const pinnedRestaurants = useMemo(
@@ -44,21 +44,12 @@ export function RestaurantMapPage() {
   }, [refresh]);
 
   const requestCurrentLocation = useCallback(() => {
-    if (!window.isSecureContext) {
+    if (!window.isSecureContext || !navigator.geolocation) {
       setLocationStatus("failed");
-      setLocationMessage("현재 위치는 localhost 또는 HTTPS 환경에서만 사용할 수 있어요.");
-      return;
-    }
-
-    if (!navigator.geolocation) {
-      setLocationStatus("failed");
-      setLocationMessage("이 브라우저에서는 현재 위치를 사용할 수 없어요.");
       return;
     }
 
     setLocationStatus("loading");
-    setLocationMessage("현재 위치를 확인하는 중이에요.");
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setCurrentLocation({
@@ -66,19 +57,17 @@ export function RestaurantMapPage() {
           longitude: position.coords.longitude,
         });
         setLocationStatus("ready");
-        setLocationMessage("현재 위치 기준으로 지도를 보고 있어요.");
       },
-      (geoError) => {
+      () => {
         setCurrentLocation(null);
         setLocationStatus("failed");
-        setLocationMessage(getLocationErrorMessage(geoError));
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
   }, []);
 
   const selectRestaurant = useCallback((restaurant: Restaurant) => {
-    setSelectedId(restaurant.id);
+    setSelectedId((current) => (current === restaurant.id ? null : restaurant.id));
   }, []);
 
   useEffect(() => {
@@ -86,48 +75,56 @@ export function RestaurantMapPage() {
   }, [requestCurrentLocation]);
 
   return (
-    <div className="tf-scroll h-full overflow-y-auto">
-      <div className="flex flex-col gap-3 p-4">
-        <div className="rounded-2xl border border-zinc-200 bg-white p-3">
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant={locationStatus === "ready" ? "primary" : "secondary"}
-              onClick={requestCurrentLocation}
-              disabled={locationStatus === "loading"}
-              className="shrink-0"
-            >
-              <Crosshair size={14} />
-              {locationStatus === "loading" ? "확인 중" : "내 위치"}
-            </Button>
-            <p
-              className={`min-w-0 flex-1 text-xs ${
-                locationStatus === "failed" ? "text-rose-500" : "text-zinc-500"
-              }`}
-            >
-              {locationMessage}
-            </p>
-          </div>
+    <div className="relative h-full overflow-hidden">
+      <RestaurantMap
+        restaurants={pinnedRestaurants}
+        selectedId={selectedRestaurant?.id ?? null}
+        currentLocation={currentLocation}
+        onSelect={selectRestaurant}
+      />
+
+      {error && (
+        <div className="absolute inset-x-3 top-3 z-20 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600 shadow-sm">
+          {error}
         </div>
+      )}
 
-        {error && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
-            {error}
-          </div>
-        )}
-
-        <RestaurantMap
-          restaurants={pinnedRestaurants}
-          selectedId={selectedRestaurant?.id ?? null}
-          currentLocation={currentLocation}
-          onSelect={selectRestaurant}
-        />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-end gap-2 p-3">
+        <button
+          type="button"
+          onClick={requestCurrentLocation}
+          disabled={locationStatus === "loading"}
+          aria-label="내 위치로 이동"
+          title={locationStatus === "failed" ? "위치를 가져오지 못했어요. 다시 시도하려면 누르세요." : "내 위치로 이동"}
+          className={cn(
+            "pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border bg-white shadow-md transition-colors",
+            locationStatus === "ready"
+              ? "border-brand-300 text-leaf-600"
+              : locationStatus === "failed"
+                ? "border-rose-200 text-rose-500 hover:bg-rose-50"
+                : "border-zinc-200 text-zinc-500 hover:bg-zinc-50",
+          )}
+        >
+          {locationStatus === "loading" ? (
+            <RefreshCw size={18} className="animate-spin" />
+          ) : (
+            <Crosshair size={18} />
+          )}
+        </button>
 
         {selectedRestaurant && (
-          <article className="rounded-2xl border border-leaf-200 bg-leaf-50 p-3.5 text-left">
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-amber-500">
-                <Star size={17} fill="currentColor" />
+          <article className="pointer-events-auto relative w-full rounded-2xl border border-brand-200 bg-brand-50 p-3.5 text-left shadow-xl">
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              aria-label="닫기"
+              className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/70 hover:text-zinc-600"
+            >
+              <X size={15} />
+            </button>
+            <div className="flex items-start gap-3 pr-4">
+              <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-brand-500">
+                <MapPin size={17} />
               </span>
               <div className="min-w-0 flex-1">
                 <strong className="block truncate text-sm font-semibold text-zinc-900">
@@ -161,7 +158,7 @@ export function RestaurantMapPage() {
                       href={getKakaoDirectionUrl(selectedRestaurant) ?? selectedRestaurant.kakao_place_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl border border-leaf-200 bg-white text-xs font-semibold text-leaf-600"
+                      className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl border border-brand-300 bg-white text-xs font-semibold text-brand-700"
                     >
                       <ExternalLink size={13} />
                       길찾기
@@ -174,7 +171,7 @@ export function RestaurantMapPage() {
                         state: { restaurant: selectedRestaurant },
                       })
                     }
-                    className="inline-flex h-8 flex-1 items-center justify-center rounded-xl bg-leaf-600 text-xs font-semibold text-white"
+                    className="inline-flex h-8 flex-1 items-center justify-center rounded-xl bg-brand-300 text-xs font-semibold text-brand-700 hover:bg-brand-200"
                   >
                     상세보기
                   </button>
@@ -183,30 +180,17 @@ export function RestaurantMapPage() {
             </div>
           </article>
         )}
-
-        {pinnedRestaurants.length === 0 && (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-8 text-center">
-            <MapPin className="text-zinc-300" size={30} />
-            <div className="text-sm text-zinc-500">저장한 맛집이 지도에 표시돼요.</div>
-            <Button variant="secondary" onClick={() => navigate("/restaurants/new")}>
-              맛집 저장하기
-            </Button>
-          </div>
-        )}
       </div>
+
+      {pinnedRestaurants.length === 0 && (
+        <div className="absolute inset-x-6 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-3 rounded-2xl border border-dashed border-zinc-200 bg-white/95 px-4 py-8 text-center shadow-sm">
+          <MapPin className="text-zinc-300" size={30} />
+          <div className="text-sm text-zinc-500">저장한 맛집이 지도에 표시돼요.</div>
+          <Button variant="secondary" onClick={() => navigate("/restaurants/new")}>
+            맛집 저장하기
+          </Button>
+        </div>
+      )}
     </div>
   );
-}
-
-function getLocationErrorMessage(error: GeolocationPositionError) {
-  if (error.code === error.PERMISSION_DENIED) {
-    return "위치 권한이 꺼져 있어요. 브라우저 주소창 권한에서 위치를 허용해주세요.";
-  }
-  if (error.code === error.POSITION_UNAVAILABLE) {
-    return "현재 위치를 찾지 못했어요. 잠시 후 다시 눌러주세요.";
-  }
-  if (error.code === error.TIMEOUT) {
-    return "위치 확인 시간이 초과됐어요. 다시 한 번 눌러주세요.";
-  }
-  return "현재 위치를 가져오지 못했어요.";
 }

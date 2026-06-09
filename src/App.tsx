@@ -9,6 +9,7 @@ import { RestaurantFormPage } from "./pages/RestaurantFormPage";
 import { RestaurantDetailPage } from "./pages/RestaurantDetailPage";
 import { HistoryPage } from "./pages/HistoryPage";
 import { HistoryDetailPage } from "./pages/HistoryDetailPage";
+import { MyPage } from "./pages/MyPage";
 
 /**
  * 라우트 구조
@@ -39,6 +40,7 @@ export function App() {
         <Route path="/restaurants/:id" element={<RestaurantDetailPage />} />
         <Route path="/history" element={<HistoryPage />} />
         <Route path="/history/:sessionId" element={<HistoryDetailPage />} />
+        <Route path="/mypage" element={<MyPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

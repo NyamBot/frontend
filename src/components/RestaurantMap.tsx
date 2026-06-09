@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Restaurant } from "../api";
 
 const KAKAO_MAP_SCRIPT_ID = "kakao-map-sdk";
+/** 현재 위치 기준으로 볼 때의 줌 레벨 — 카카오맵 level 2 = 약 30m 축척. */
+const CURRENT_LOCATION_LEVEL = 2;
 
 type RestaurantMapProps = {
   restaurants: Restaurant[];
@@ -39,7 +41,10 @@ export function RestaurantMap({
             currentLocation?.latitude ?? first?.latitude ?? 37.5665,
             currentLocation?.longitude ?? first?.longitude ?? 126.978,
           );
-          const map = new maps.Map(containerRef.current, { center, level: currentLocation ? 5 : first ? 5 : 8 });
+          const map = new maps.Map(containerRef.current, {
+            center,
+            level: currentLocation ? CURRENT_LOCATION_LEVEL : first ? 5 : 8,
+          });
           const bounds = new maps.LatLngBounds();
 
           if (currentLocation) {
@@ -93,7 +98,7 @@ export function RestaurantMap({
 
   if (error) {
     return (
-      <div className="flex h-[360px] items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 text-sm text-zinc-400">
+      <div className="flex h-full min-h-[320px] items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50 text-sm text-zinc-400">
         {error}
       </div>
     );
@@ -104,7 +109,7 @@ export function RestaurantMap({
       ref={containerRef}
       role="img"
       aria-label="저장된 맛집 지도"
-      className="h-[360px] w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100"
+      className="h-full min-h-[320px] w-full overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100"
     />
   );
 }
@@ -144,25 +149,30 @@ function createFavoriteMarker({
   active: boolean;
   onClick: () => void;
 }) {
+  const pinFill = active ? "#e0b21d" : "#ffd23f";
+  const pinStroke = active ? "#8a6a10" : "#e0a01a";
+  const width = active ? 40 : 34;
+  const height = Math.round(width * 1.3);
+
   const button = document.createElement("button");
   button.type = "button";
   button.setAttribute("aria-label", `${restaurant.name} 선택`);
-  button.textContent = "★";
   button.style.cssText = `
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    width:${active ? "38px" : "34px"};
-    height:${active ? "38px" : "34px"};
-    border:2px solid ${active ? "#65a30d" : "#f4c430"};
-    border-radius:999px;
-    background:${active ? "#ecfccb" : "#fff7d1"};
-    color:${active ? "#3f6212" : "#854d0e"};
-    box-shadow:0 8px 18px rgba(24,24,27,0.16);
-    font-size:${active ? "22px" : "20px"};
-    font-weight:800;
-    line-height:1;
+    display:block;
+    width:${width}px;
+    height:${height}px;
+    padding:0;
+    border:0;
+    background:transparent;
     cursor:pointer;
+    filter:drop-shadow(0 6px 8px rgba(24,24,27,0.28));
+  `;
+  button.innerHTML = `
+    <svg width="${width}" height="${height}" viewBox="0 0 34 44" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M17 2 C9 2 2.5 8.3 2.5 16 C2.5 26 17 41.5 17 41.5 C17 41.5 31.5 26 31.5 16 C31.5 8.3 25 2 17 2 Z"
+        fill="${pinFill}" stroke="${pinStroke}" stroke-width="2" />
+      <circle cx="17" cy="16" r="5.5" fill="#ffffff" />
+    </svg>
   `;
   button.addEventListener("click", onClick);
   return button;

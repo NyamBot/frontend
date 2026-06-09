@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ExternalLink, MapPin, Pencil } from "lucide-react";
-import { getRestaurant, type Restaurant } from "../api";
+import { ArrowLeft, ExternalLink, MapPin, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { deleteRestaurant, getRestaurant, type Restaurant } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { KakaoMap } from "../components/KakaoMap";
 import { Button, Card, Tag } from "../components/ui";
@@ -15,6 +15,9 @@ export function RestaurantDetailPage() {
     (location.state as { restaurant?: Restaurant } | null)?.restaurant ?? null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!token || !id) return;
@@ -27,6 +30,20 @@ export function RestaurantDetailPage() {
         setError(caught instanceof Error ? caught.message : "맛집 정보를 불러오지 못했습니다.");
       });
   }, [token, id]);
+
+  async function handleDelete() {
+    if (!token || !restaurant || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteRestaurant(restaurant.id, token);
+      navigate("/restaurants");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "맛집 삭제에 실패했습니다.");
+      setDeleting(false);
+      setConfirmOpen(false);
+    }
+  }
 
   if (error) {
     return (
@@ -49,14 +66,58 @@ export function RestaurantDetailPage() {
           <Button variant="ghost" size="icon" onClick={() => navigate("/restaurants")} aria-label="목록으로">
             <ArrowLeft size={18} />
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => navigate(`/restaurants/${restaurant.id}/edit`, { state: { restaurant } })}
-          >
-            <Pencil size={14} />
-            수정
-          </Button>
+          <div className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMenuOpen((value) => !value)}
+              aria-label="더보기"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+            >
+              <MoreVertical size={18} />
+            </Button>
+            {menuOpen && (
+              <>
+                <button
+                  type="button"
+                  aria-hidden
+                  tabIndex={-1}
+                  onClick={() => setMenuOpen(false)}
+                  className="fixed inset-0 z-40 cursor-default"
+                />
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full z-50 mt-1 w-32 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      navigate(`/restaurants/${restaurant.id}/edit`, { state: { restaurant } });
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50"
+                  >
+                    <Pencil size={14} />
+                    수정
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setConfirmOpen(true);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-rose-500 transition-colors hover:bg-rose-50"
+                  >
+                    <Trash2 size={14} />
+                    삭제
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <Card className="p-4">
@@ -111,6 +172,34 @@ export function RestaurantDetailPage() {
           </div>
         </Card>
       </div>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-end bg-zinc-950/25 px-4 pb-4 sm:items-center sm:justify-center sm:p-4">
+          <section className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl">
+            <h2 className="text-sm font-semibold text-zinc-900">맛집을 삭제할까요?</h2>
+            <p className="mt-2 text-sm leading-relaxed text-zinc-500">
+              {restaurant.name}과 저장한 기록이 함께 삭제됩니다.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button
+                className="flex-1"
+                variant="secondary"
+                onClick={() => setConfirmOpen(false)}
+                disabled={deleting}
+              >
+                취소
+              </Button>
+              <Button
+                className="flex-1 bg-rose-500 text-white hover:bg-rose-600"
+                onClick={() => void handleDelete()}
+                disabled={deleting}
+              >
+                {deleting ? "삭제 중..." : "삭제"}
+              </Button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

@@ -72,7 +72,7 @@ export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 
 export function Tag({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-full bg-leaf-50 px-2 py-0.5 text-[11px] font-medium text-leaf-500">
+    <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-600">
       {children}
     </span>
   );
