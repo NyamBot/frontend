@@ -84,6 +84,7 @@ export function ChatPage() {
     setQuery("");
     setLoading(true);
     setError(null);
+    setRecommendations([]);
 
     setMessages((prev) => [
       ...prev,
@@ -147,6 +148,9 @@ export function ChatPage() {
   }
 
   const hasThread = messages.length > 0;
+  const lastMessage = messages[messages.length - 1];
+  const displayedMessages =
+    recommendations.length > 0 && lastMessage?.role === "assistant" ? messages.slice(0, -1) : messages;
 
   return (
     <div className="flex h-full flex-col">
@@ -276,11 +280,7 @@ export function ChatPage() {
       )}
 
       <div ref={threadRef} className="tf-scroll flex-1 space-y-5 overflow-y-auto px-4 py-5">
-        <Bubble role="assistant">
-          저장해둔 맛집 메모를 기준으로 골라볼게요. 원하는 상황을 편하게 말해주세요.
-        </Bubble>
-
-        {messages.map((message) => (
+        {displayedMessages.map((message) => (
           <Bubble key={message.id} role={message.role}>
             {message.content}
           </Bubble>
@@ -288,16 +288,12 @@ export function ChatPage() {
 
         {loading && (
           <Bubble role="assistant" muted>
-            저장된 메모와 조건을 비교하고 있어요...
+            <TypingIndicator />
           </Bubble>
         )}
 
         {recommendations.length > 0 && (
-          <div className="space-y-3 pl-11">
-            {recommendations.map((recommendation, index) => (
-              <RecommendationCard key={recommendation.restaurant.id} rec={recommendation} rank={index + 1} />
-            ))}
-          </div>
+          <RecommendationMessage recommendations={recommendations} />
         )}
 
         {!hasThread && !loading && (
@@ -438,34 +434,79 @@ function Bubble({
   );
 }
 
+function TypingIndicator() {
+  return (
+    <div className="flex h-5 items-center gap-1.5" aria-label="추천 생성 중">
+      {[0, 1, 2].map((index) => (
+        <span
+          key={index}
+          className="h-2 w-2 rounded-full bg-zinc-400"
+          style={{
+            animation: "typing-dot 0.9s ease-in-out infinite",
+            animationDelay: `${index * 0.14}s`,
+          }}
+        />
+      ))}
+      <style>
+        {`
+          @keyframes typing-dot {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.35; }
+            40% { transform: translateY(-4px); opacity: 1; }
+          }
+        `}
+      </style>
+    </div>
+  );
+}
+
+function RecommendationMessage({ recommendations }: { recommendations: RestaurantRecommendation[] }) {
+  return (
+    <div className="flex w-full">
+      <div className="flex max-w-[88%] gap-2.5">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center">
+          <MiniMascot className="h-8 w-8" />
+        </div>
+        <div className="min-w-0 flex-1 space-y-2">
+          <span className="text-[11px] font-medium text-zinc-400">NyamBot</span>
+          <div className="space-y-4 rounded-2xl bg-zinc-100 px-3.5 py-3">
+            {recommendations.map((recommendation, index) => (
+              <RecommendationCard key={recommendation.restaurant.id} rec={recommendation} rank={index + 1} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RecommendationCard({ rec, rank }: { rec: RestaurantRecommendation; rank: number }) {
   const restaurant = rec.restaurant;
+  const description = buildRecommendationDescription(rec);
+  const metaParts = [restaurant.area, restaurant.cuisine, restaurant.price_level].filter(Boolean);
+
   return (
-    <article className="rounded-2xl border border-zinc-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <strong className="block truncate text-sm font-semibold text-zinc-900">{restaurant.name}</strong>
-          <span className="text-xs text-zinc-500">
-            {restaurant.area} · {restaurant.cuisine} · {restaurant.price_level}
+    <div className="space-y-2">
+      <article className="rounded-2xl border border-zinc-200 bg-white p-3.5 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <strong className="block truncate text-sm font-semibold text-zinc-900">{restaurant.name}</strong>
+            <span className="text-xs text-zinc-500">
+              {metaParts.join(" · ")}
+            </span>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-leaf-600">
+            <Sparkles size={11} />
+            {rank}순위
           </span>
         </div>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-leaf-600">
-          <Sparkles size={11} />
-          {rank}순위
-        </span>
-      </div>
-      <p className="mt-2 text-sm leading-relaxed text-zinc-700">{rec.reason}</p>
-      {rec.evidence.slice(0, 1).map((evidence) => (
-        <blockquote
-          key={evidence}
-          className="mt-2 border-l-2 border-leaf-200 bg-leaf-50/50 px-3 py-1.5 text-xs italic text-zinc-600"
-        >
-          {evidence}
-        </blockquote>
-      ))}
-      <div className="mt-3 flex items-center justify-between gap-2">
-        {rec.menu_tip && <small className="text-xs text-zinc-500">{rec.menu_tip}</small>}
-        {restaurant.kakao_place_url && (
+      </article>
+
+      <p className="rounded-2xl bg-white px-3.5 py-2.5 text-sm leading-relaxed text-zinc-800">
+        {description}
+      </p>
+
+      {restaurant.kakao_place_url && (
+        <div className="flex justify-end">
           <a
             href={restaurant.kakao_place_url}
             target="_blank"
@@ -473,10 +514,31 @@ function RecommendationCard({ rec, rank }: { rec: RestaurantRecommendation; rank
             className="inline-flex items-center gap-1 text-xs font-medium text-leaf-500 hover:text-leaf-600"
           >
             <Compass size={12} />
-            지도
+            카카오맵으로 바로가기
           </a>
-        )}
-      </div>
-    </article>
+        </div>
+      )}
+    </div>
   );
 }
+
+function buildRecommendationDescription(rec: RestaurantRecommendation) {
+  const evidence = rec.evidence[0]?.trim();
+  const caution = rec.caution?.trim();
+  const isExternalCandidate = rec.restaurant.id.startsWith("kakao-") || rec.restaurant.note_count === 0;
+  const parts = [];
+
+  if (evidence) {
+    const cleanEvidence = evidence.replace(/[.!?。！？]+$/, "");
+    parts.push(isExternalCandidate ? cleanEvidence : `${cleanEvidence}라는 기록이 있어.`);
+  } else {
+    parts.push(rec.reason.replace(/[.!?。！？]+$/, ""));
+  }
+
+  if (caution && !isExternalCandidate) {
+    parts.push(caution.replace(/[.!?。！？]+$/, ""));
+  }
+
+  return parts.join(" ");
+}
+

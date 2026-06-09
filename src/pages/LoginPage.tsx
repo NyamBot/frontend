@@ -1,6 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { NyamBotLogo } from "../components/Logo";
+import { MiniMascot } from "../components/Mascot";
 
 export function LoginPage() {
   const { token, user, initialized, authError, login } = useAuth();
@@ -14,7 +14,7 @@ export function LoginPage() {
     <div className="flex min-h-screen justify-center sm:py-6">
       {/* 폰 프레임 안 1단 중앙 정렬: 마스코트 → 브랜드 → 카피 → CTA */}
       <div className="flex h-screen w-full max-w-[440px] flex-col items-center justify-center bg-white px-7 py-10 text-center sm:h-[calc(100vh-3rem)] sm:max-h-[920px] sm:rounded-[2rem] sm:border sm:border-zinc-200 sm:shadow-xl">
-        <NyamBotLogo size={160} />
+        <MiniMascot className="h-40 w-40" />
 
         <div className="mt-5 text-xl font-bold text-zinc-900">
           NyamBot <span className="text-brand-500">AI</span>

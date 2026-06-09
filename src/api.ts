@@ -1,5 +1,8 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
-export const KAKAO_LOGIN_URL = `${API_BASE}/api/auth/kakao/login`;
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+const API_PREFIX = import.meta.env.VITE_API_PREFIX ?? "/api/v1";
+const API_URL = `${API_BASE}${API_PREFIX}`;
+
+export const KAKAO_LOGIN_URL = `${API_URL}/auth/kakao/login`;
 
 export type User = {
   id: string;
@@ -99,7 +102,7 @@ async function parseError(response: Response, fallback: string) {
 }
 
 export async function getCurrentUser(token: string) {
-  const response = await fetch(`${API_BASE}/api/auth/me`, {
+  const response = await fetch(`${API_URL}/auth/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to load current user"));
@@ -107,7 +110,7 @@ export async function getCurrentUser(token: string) {
 }
 
 export async function exchangeAuthCode(code: string) {
-  const response = await fetch(`${API_BASE}/api/auth/session`, {
+  const response = await fetch(`${API_URL}/auth/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ code }),
@@ -117,7 +120,7 @@ export async function exchangeAuthCode(code: string) {
 }
 
 export async function listUsers() {
-  const response = await fetch(`${API_BASE}/api/users`);
+  const response = await fetch(`${API_URL}/users`);
   if (!response.ok) throw new Error("Failed to list users");
   return response.json() as Promise<User[]>;
 }
@@ -129,7 +132,7 @@ export async function createUser(payload: {
   auth_provider?: string;
   provider_subject?: string | null;
 }) {
-  const response = await fetch(`${API_BASE}/api/users`, {
+  const response = await fetch(`${API_URL}/users`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -154,7 +157,7 @@ export async function createRestaurant(payload: {
   latitude?: number | null;
   longitude?: number | null;
 }, token: string) {
-  const response = await fetch(`${API_BASE}/api/restaurants`, {
+  const response = await fetch(`${API_URL}/restaurants`, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(payload),
@@ -163,8 +166,16 @@ export async function createRestaurant(payload: {
   return response.json() as Promise<Restaurant>;
 }
 
-export async function listRestaurants(token: string) {
-  const response = await fetch(`${API_BASE}/api/restaurants`, {
+export async function listRestaurants(
+  token: string,
+  filters: { city?: string; district?: string; town?: string } = {},
+) {
+  const params = new URLSearchParams();
+  if (filters.city) params.set("city", filters.city);
+  if (filters.district) params.set("district", filters.district);
+  if (filters.town) params.set("town", filters.town);
+  const query = params.toString();
+  const response = await fetch(`${API_URL}/restaurants${query ? `?${query}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to list restaurants"));
@@ -172,7 +183,7 @@ export async function listRestaurants(token: string) {
 }
 
 export async function getRestaurant(restaurantId: string, token: string) {
-  const response = await fetch(`${API_BASE}/api/restaurants/${encodeURIComponent(restaurantId)}`, {
+  const response = await fetch(`${API_URL}/restaurants/${encodeURIComponent(restaurantId)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to load restaurant"));
@@ -197,7 +208,7 @@ export async function updateRestaurant(
   },
   token: string,
 ) {
-  const response = await fetch(`${API_BASE}/api/restaurants/${encodeURIComponent(restaurantId)}`, {
+  const response = await fetch(`${API_URL}/restaurants/${encodeURIComponent(restaurantId)}`, {
     method: "PUT",
     headers: authHeaders(token),
     body: JSON.stringify(payload),
@@ -214,7 +225,7 @@ export async function addRestaurantNote(
   },
   token: string,
 ) {
-  const response = await fetch(`${API_BASE}/api/restaurants/${encodeURIComponent(restaurantId)}/notes`, {
+  const response = await fetch(`${API_URL}/restaurants/${encodeURIComponent(restaurantId)}/notes`, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(payload),
@@ -224,7 +235,7 @@ export async function addRestaurantNote(
 }
 
 export async function deleteRestaurant(restaurantId: string, token: string) {
-  const response = await fetch(`${API_BASE}/api/restaurants/${encodeURIComponent(restaurantId)}`, {
+  const response = await fetch(`${API_URL}/restaurants/${encodeURIComponent(restaurantId)}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -233,7 +244,7 @@ export async function deleteRestaurant(restaurantId: string, token: string) {
 
 export async function searchKakaoPlaces(query: string, size = 5) {
   const params = new URLSearchParams({ query, size: String(size) });
-  const response = await fetch(`${API_BASE}/api/restaurants/kakao/search?${params.toString()}`);
+  const response = await fetch(`${API_URL}/restaurants/kakao/search?${params.toString()}`);
   if (!response.ok) throw new Error("Failed to search Kakao places");
   return response.json() as Promise<{ query: string; places: KakaoPlace[] }>;
 }
@@ -251,7 +262,7 @@ export async function chatTasteAgent(payload: {
   longitude?: number | null;
   limit?: number;
 }, token: string) {
-  const response = await fetch(`${API_BASE}/api/restaurants/chat`, {
+  const response = await fetch(`${API_URL}/restaurants/chat`, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(payload),
@@ -266,7 +277,7 @@ export async function chatTasteAgent(payload: {
 }
 
 export async function listTasteAgentMessages(token: string) {
-  const response = await fetch(`${API_BASE}/api/restaurants/chat/messages`, {
+  const response = await fetch(`${API_URL}/restaurants/chat/messages`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to list taste agent messages"));
@@ -274,7 +285,7 @@ export async function listTasteAgentMessages(token: string) {
 }
 
 export async function listTasteAgentSessions(token: string) {
-  const response = await fetch(`${API_BASE}/api/restaurants/chat/sessions`, {
+  const response = await fetch(`${API_URL}/restaurants/chat/sessions`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to list taste agent sessions"));
