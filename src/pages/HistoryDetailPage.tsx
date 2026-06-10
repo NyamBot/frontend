@@ -66,14 +66,13 @@ export function HistoryDetailPage() {
       </div>
 
       <div className="tf-scroll flex-1 space-y-5 overflow-y-auto px-4 py-5">
-        {session.messages.map((message) => (
-          <div key={message.id} className="space-y-3">
-            <HistoryBubble message={message} />
-            {message.role === "assistant" && message.metadata.recommendations?.length ? (
-              <RecommendationMessage recommendations={message.metadata.recommendations} />
-            ) : null}
-          </div>
-        ))}
+        {session.messages.map((message) =>
+          message.role === "assistant" && message.metadata.recommendations?.length ? (
+            <RecommendationMessage key={message.id} recommendations={message.metadata.recommendations} />
+          ) : (
+            <HistoryBubble key={message.id} message={message} />
+          ),
+        )}
         {!session.messages.length && (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
             <MiniMascot className="h-14 w-14" />
