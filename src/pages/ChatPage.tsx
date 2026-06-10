@@ -3,7 +3,6 @@ import { useLocation as useRouteLocation } from "react-router-dom";
 import { AlertTriangle, MapPin, MapPinOff, RefreshCw, Send, SlidersHorizontal, Sparkles, SquarePen } from "lucide-react";
 import {
   chatTasteAgent,
-  listTasteAgentSessions,
   type RestaurantRecommendation,
   type TasteAgentMessage,
   type TasteAgentSession,
@@ -22,7 +21,6 @@ const QUICK_QUERIES = [
 
 const CUISINE_OPTIONS = ["한식", "일식", "중식", "양식", "분식", "카페", "술집"];
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
-const ACTIVE_CHAT_SESSION_KEY = "nyambot.activeChatSessionId";
 
 export function ChatPage() {
   const { token } = useAuth();
@@ -56,34 +54,15 @@ export function ChatPage() {
       activateSession(routeSession);
       return;
     }
-    void restoreActiveSession();
+    clearChat();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, location.state]);
 
   function activateSession(session: TasteAgentSession) {
-    window.localStorage.setItem(ACTIVE_CHAT_SESSION_KEY, session.id);
     setSessionId(session.id);
     setMessages(session.messages);
     setRecommendations(getLatestAssistantRecommendations(session.messages));
     setError(null);
-  }
-
-  async function restoreActiveSession() {
-    if (!token || messages.length > 0) return;
-    const activeSessionId = window.localStorage.getItem(ACTIVE_CHAT_SESSION_KEY);
-    if (!activeSessionId) return;
-
-    try {
-      const data = await listTasteAgentSessions(token);
-      const activeSession = data.sessions.find((session) => session.id === activeSessionId);
-      if (!activeSession) {
-        window.localStorage.removeItem(ACTIVE_CHAT_SESSION_KEY);
-        return;
-      }
-      activateSession(activeSession);
-    } catch {
-      // 채팅 복원 실패는 새 질문 흐름을 막지 않는다.
-    }
   }
 
   function requestCurrentLocation() {
@@ -110,7 +89,6 @@ export function ChatPage() {
   }
 
   function clearChat() {
-    window.localStorage.removeItem(ACTIVE_CHAT_SESSION_KEY);
     setSessionId(null);
     setMessages([]);
     setRecommendations([]);
@@ -162,7 +140,6 @@ export function ChatPage() {
         token,
       );
       setSessionId(response.session_id);
-      window.localStorage.setItem(ACTIVE_CHAT_SESSION_KEY, response.session_id);
       setMessages((prev) => [
         ...prev,
         {
@@ -189,9 +166,6 @@ export function ChatPage() {
   }
 
   const hasThread = messages.length > 0;
-  const lastMessage = messages[messages.length - 1];
-  const displayedMessages =
-    recommendations.length > 0 && lastMessage?.role === "assistant" ? messages.slice(0, -1) : messages;
 
   return (
     <div className="flex h-full flex-col">
@@ -264,7 +238,7 @@ export function ChatPage() {
           variant="ghost"
           size="sm"
           onClick={clearChat}
-          disabled={!hasThread && recommendations.length === 0}
+          disabled={!hasThread}
           aria-label="새 대화"
         >
           <SquarePen size={14} />
@@ -304,20 +278,20 @@ export function ChatPage() {
       )}
 
       <div ref={threadRef} className="tf-scroll flex-1 space-y-5 overflow-y-auto px-4 py-5">
-        {displayedMessages.map((message) => (
-          <Bubble key={message.id} role={message.role}>
-            {message.content}
-          </Bubble>
-        ))}
+        {messages.map((message) =>
+          message.role === "assistant" && message.metadata.recommendations?.length ? (
+            <RecommendationMessage key={message.id} recommendations={message.metadata.recommendations} />
+          ) : (
+            <Bubble key={message.id} role={message.role}>
+              {message.content}
+            </Bubble>
+          ),
+        )}
 
         {loading && (
           <Bubble role="assistant" muted>
             <TypingIndicator />
           </Bubble>
-        )}
-
-        {recommendations.length > 0 && (
-          <RecommendationMessage recommendations={recommendations} />
         )}
 
         {!hasThread && !loading && (
