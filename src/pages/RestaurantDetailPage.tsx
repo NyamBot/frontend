@@ -121,6 +121,13 @@ export function RestaurantDetailPage() {
         </div>
 
         <Card className="p-4">
+          {restaurant.image_url && (
+            <img
+              src={restaurant.image_url}
+              alt=""
+              className="mb-4 aspect-video w-full rounded-2xl object-cover"
+            />
+          )}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="truncate text-lg font-bold text-zinc-900">{restaurant.name}</h2>
@@ -128,6 +135,9 @@ export function RestaurantDetailPage() {
                 {restaurant.area} · {restaurant.cuisine} · {restaurant.price_level}
               </p>
             </div>
+            <span className="shrink-0 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-leaf-600">
+              {restaurant.rating_level}
+            </span>
           </div>
 
           {restaurant.mood_tags.length > 0 && (

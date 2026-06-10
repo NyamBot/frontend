@@ -34,6 +34,8 @@ export type Restaurant = {
   phone: string | null;
   latitude: number | null;
   longitude: number | null;
+  image_url: string | null;
+  rating_level: "상" | "중" | "하";
   note_count: number;
   created_at: string;
 };
@@ -145,6 +147,14 @@ export async function createUser(payload: {
   return response.json() as Promise<User>;
 }
 
+export async function deleteCurrentUser(token: string) {
+  const response = await fetch(`${API_URL}/users/me`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to delete current user"));
+}
+
 export async function createRestaurant(payload: {
   name: string;
   area: string;
@@ -163,6 +173,8 @@ export async function createRestaurant(payload: {
   phone?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  image_url?: string | null;
+  rating_level?: "상" | "중" | "하";
 }, token: string) {
   const response = await fetch(`${API_URL}/restaurants`, {
     method: "POST",
@@ -175,12 +187,14 @@ export async function createRestaurant(payload: {
 
 export async function listRestaurants(
   token: string,
-  filters: { city?: string; district?: string; town?: string } = {},
+  filters: { city?: string; district?: string; town?: string; query?: string; rating_level?: string } = {},
 ) {
   const params = new URLSearchParams();
   if (filters.city) params.set("city", filters.city);
   if (filters.district) params.set("district", filters.district);
   if (filters.town) params.set("town", filters.town);
+  if (filters.query) params.set("query", filters.query);
+  if (filters.rating_level) params.set("rating_level", filters.rating_level);
   const query = params.toString();
   const response = await fetch(`${API_URL}/restaurants${query ? `?${query}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -215,6 +229,8 @@ export async function updateRestaurant(
     phone?: string | null;
     latitude?: number | null;
     longitude?: number | null;
+    image_url?: string | null;
+    rating_level?: "상" | "중" | "하";
   },
   token: string,
 ) {

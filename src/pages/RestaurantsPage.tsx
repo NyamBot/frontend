@@ -5,9 +5,10 @@ import { cn } from "../lib/utils";
 import { listRestaurants, type Restaurant } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
-import { Button, Tag } from "../components/ui";
+import { Button, Tag, TextInput } from "../components/ui";
 import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
 
+const RATING_OPTIONS = ["상", "중", "하"] as const;
 
 export function RestaurantsPage() {
   const { token } = useAuth();
@@ -15,12 +16,14 @@ export function RestaurantsPage() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRating, setSelectedRating] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, selectedCity, selectedDistrict]);
+  }, [token, selectedCity, selectedDistrict, searchQuery, selectedRating]);
 
   async function refresh() {
     if (!token) return;
@@ -29,6 +32,8 @@ export function RestaurantsPage() {
         await listRestaurants(token, {
           city: selectedCity,
           district: selectedDistrict,
+          query: searchQuery.trim(),
+          rating_level: selectedRating,
         }),
       );
       setError(null);
@@ -63,12 +68,38 @@ export function RestaurantsPage() {
     if (!regionMatches(row.location.district, selectedDistrict)) return false;
     return true;
   });
-  const hasLocationFilter = Boolean(selectedCity || selectedDistrict);
+  const hasLocationFilter = Boolean(selectedCity || selectedDistrict || searchQuery.trim() || selectedRating);
 
   return (
     <div className="flex h-full flex-col">
       <div className="tf-scroll flex-1 overflow-y-auto">
         <div className="flex flex-col gap-3 p-4">
+        {(restaurants.length > 0 || hasLocationFilter) && (
+          <section className="space-y-2 rounded-2xl border border-zinc-200 bg-white p-3">
+            <TextInput
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="식당명, 지역, 음식 종류, 태그 검색"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              {RATING_OPTIONS.map((rating) => (
+                <button
+                  key={rating}
+                  type="button"
+                  onClick={() => setSelectedRating((current) => (current === rating ? "" : rating))}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                    selectedRating === rating
+                      ? "border-brand-300 bg-brand-50 text-leaf-600"
+                      : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
+                  )}
+                >
+                  {rating}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         {(restaurants.length > 0 || hasLocationFilter) && (
           <section className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white p-3">
             <RegionSelect
@@ -95,6 +126,8 @@ export function RestaurantsPage() {
                 onClick={() => {
                   setSelectedCity("");
                   setSelectedDistrict("");
+                  setSearchQuery("");
+                  setSelectedRating("");
                 }}
                 aria-label="지역 필터 초기화"
                 className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
@@ -116,12 +149,27 @@ export function RestaurantsPage() {
             key={restaurant.id}
             className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3.5"
           >
+            {restaurant.image_url && (
+              <img
+                src={restaurant.image_url}
+                alt=""
+                className="h-14 w-14 shrink-0 rounded-xl object-cover"
+                loading="lazy"
+              />
+            )}
             <button
               type="button"
               onClick={() => navigate(`/restaurants/${restaurant.id}`, { state: { restaurant } })}
               className="min-w-0 flex-1 text-left"
             >
-              <strong className="block text-sm font-semibold text-zinc-900">{restaurant.name}</strong>
+              <div className="flex items-center gap-2">
+                <strong className="block min-w-0 flex-1 truncate text-sm font-semibold text-zinc-900">
+                  {restaurant.name}
+                </strong>
+                <span className="shrink-0 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-leaf-600">
+                  {restaurant.rating_level}
+                </span>
+              </div>
               <span className="text-xs text-zinc-500">
                 {restaurant.area} · {restaurant.cuisine} · {restaurant.price_level}
               </span>

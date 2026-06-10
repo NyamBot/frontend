@@ -15,6 +15,7 @@ import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
 import { cn, extractArea, extractCuisine } from "../lib/utils";
 
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
+const RATING_OPTIONS = ["상", "중", "하"] as const;
 const TAG_EXAMPLES = ["조용한", "혼밥", "재방문"];
 
 export function RestaurantFormPage() {
@@ -41,6 +42,8 @@ export function RestaurantFormPage() {
   const [regionDistrict, setRegionDistrict] = useState("");
   const [cuisine, setCuisine] = useState("");
   const [priceLevel, setPriceLevel] = useState(PRICE_OPTIONS[1]);
+  const [ratingLevel, setRatingLevel] = useState<(typeof RATING_OPTIONS)[number]>("중");
+  const [imageUrl, setImageUrl] = useState("");
   const [moodTags, setMoodTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [note, setNote] = useState("");
@@ -85,6 +88,8 @@ export function RestaurantFormPage() {
     setArea(region.area || restaurant.area);
     setCuisine(restaurant.cuisine);
     setPriceLevel(restaurant.price_level);
+    setRatingLevel(restaurant.rating_level ?? "중");
+    setImageUrl(restaurant.image_url ?? "");
     setMoodTags(restaurant.mood_tags);
     setManualEntry(true);
   }
@@ -104,6 +109,8 @@ export function RestaurantFormPage() {
     setRegionDistrict(region.district);
     setArea(region.area || extractArea(place.address_name || place.road_address_name));
     setCuisine(extractCuisine(place.category_name));
+    setRatingLevel("중");
+    setImageUrl("");
     setNote((current) =>
       current.trim()
         ? current
@@ -121,6 +128,8 @@ export function RestaurantFormPage() {
     setRegionCity("");
     setRegionDistrict("");
     setCuisine("");
+    setRatingLevel("중");
+    setImageUrl("");
   }
 
   function changePlace() {
@@ -131,6 +140,8 @@ export function RestaurantFormPage() {
     setRegionCity("");
     setRegionDistrict("");
     setCuisine("");
+    setRatingLevel("중");
+    setImageUrl("");
   }
 
   function updateRegion(nextCity: string, nextDistrict = "") {
@@ -189,6 +200,8 @@ export function RestaurantFormPage() {
             phone: target?.phone ?? null,
             latitude: target?.latitude ?? null,
             longitude: target?.longitude ?? null,
+            image_url: imageUrl.trim() || null,
+            rating_level: ratingLevel,
           },
           token,
         );
@@ -213,6 +226,8 @@ export function RestaurantFormPage() {
             phone: selectedPlace?.phone ?? null,
             latitude: selectedPlace ? Number(selectedPlace.y) : mapLocation?.latitude ?? null,
             longitude: selectedPlace ? Number(selectedPlace.x) : mapLocation?.longitude ?? null,
+            image_url: imageUrl.trim() || null,
+            rating_level: ratingLevel,
           },
           token,
         );
@@ -347,18 +362,41 @@ export function RestaurantFormPage() {
         )}
 
         {(selectedPlace || manualEntry || editing) && (
-          <Field label="가격대">
-            <ChipRow>
-              {PRICE_OPTIONS.map((option) => (
-                <ChoiceChip
-                  key={option}
-                  label={option}
-                  selected={priceLevel === option}
-                  onClick={() => setPriceLevel(option)}
-                />
-              ))}
-            </ChipRow>
-          </Field>
+          <>
+            <Field label="가격대">
+              <ChipRow>
+                {PRICE_OPTIONS.map((option) => (
+                  <ChoiceChip
+                    key={option}
+                    label={option}
+                    selected={priceLevel === option}
+                    onClick={() => setPriceLevel(option)}
+                  />
+                ))}
+              </ChipRow>
+            </Field>
+
+            <Field label="내 평가">
+              <ChipRow>
+                {RATING_OPTIONS.map((option) => (
+                  <ChoiceChip
+                    key={option}
+                    label={option}
+                    selected={ratingLevel === option}
+                    onClick={() => setRatingLevel(option)}
+                  />
+                ))}
+              </ChipRow>
+            </Field>
+
+            <Field label="사진 URL">
+              <TextInput
+                value={imageUrl}
+                onChange={(event) => setImageUrl(event.target.value)}
+                placeholder="https://..."
+              />
+            </Field>
+          </>
         )}
 
         <Field label="분위기 태그">
