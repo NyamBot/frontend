@@ -15,6 +15,7 @@ import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
 import { cn, extractArea, extractCuisine } from "../lib/utils";
 
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
+const TAG_EXAMPLES = ["조용한", "혼밥", "재방문"];
 
 export function RestaurantFormPage() {
   const { token } = useAuth();
@@ -377,6 +378,16 @@ export function RestaurantFormPage() {
               <Plus size={16} />
             </Button>
           </div>
+          <ChipRow>
+            {TAG_EXAMPLES.map((tag) => (
+              <ChoiceChip
+                key={tag}
+                label={`#${tag}`}
+                selected={moodTags.includes(tag)}
+                onClick={() => addMoodTag(tag)}
+              />
+            ))}
+          </ChipRow>
           {moodTags.length > 0 && (
             <ChipRow>
               {moodTags.map((tag) => (
