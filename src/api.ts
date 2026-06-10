@@ -15,6 +15,8 @@ export type User = {
   last_login_at: string | null;
 };
 
+export type RatingLevel = "인생맛집" | "맛남" | "쏘쏘";
+
 export type Restaurant = {
   id: string;
   user_id: string | null;
@@ -35,7 +37,7 @@ export type Restaurant = {
   latitude: number | null;
   longitude: number | null;
   image_url: string | null;
-  rating_level: "상" | "중" | "하";
+  rating_level: RatingLevel;
   note_count: number;
   created_at: string;
 };
@@ -174,7 +176,7 @@ export async function createRestaurant(payload: {
   latitude?: number | null;
   longitude?: number | null;
   image_url?: string | null;
-  rating_level?: "상" | "중" | "하";
+  rating_level?: RatingLevel;
 }, token: string) {
   const response = await fetch(`${API_URL}/restaurants`, {
     method: "POST",
@@ -230,7 +232,7 @@ export async function updateRestaurant(
     latitude?: number | null;
     longitude?: number | null;
     image_url?: string | null;
-    rating_level?: "상" | "중" | "하";
+    rating_level?: RatingLevel;
   },
   token: string,
 ) {

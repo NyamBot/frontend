@@ -8,7 +8,7 @@ import { MiniMascot } from "../components/Mascot";
 import { Button, Tag, TextInput } from "../components/ui";
 import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
 
-const RATING_OPTIONS = ["상", "중", "하"] as const;
+const RATING_OPTIONS = ["인생맛집", "맛남", "쏘쏘"] as const;
 
 export function RestaurantsPage() {
   const { token } = useAuth();

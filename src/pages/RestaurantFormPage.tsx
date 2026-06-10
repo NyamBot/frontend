@@ -15,7 +15,7 @@ import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
 import { cn, extractArea, extractCuisine } from "../lib/utils";
 
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
-const RATING_OPTIONS = ["상", "중", "하"] as const;
+const RATING_OPTIONS = ["인생맛집", "맛남", "쏘쏘"] as const;
 const TAG_EXAMPLES = ["조용한", "혼밥", "재방문"];
 
 export function RestaurantFormPage() {
@@ -42,7 +42,7 @@ export function RestaurantFormPage() {
   const [regionDistrict, setRegionDistrict] = useState("");
   const [cuisine, setCuisine] = useState("");
   const [priceLevel, setPriceLevel] = useState(PRICE_OPTIONS[1]);
-  const [ratingLevel, setRatingLevel] = useState<(typeof RATING_OPTIONS)[number]>("중");
+  const [ratingLevel, setRatingLevel] = useState<(typeof RATING_OPTIONS)[number]>("맛남");
   const [imageUrl, setImageUrl] = useState("");
   const [moodTags, setMoodTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
@@ -88,7 +88,7 @@ export function RestaurantFormPage() {
     setArea(region.area || restaurant.area);
     setCuisine(restaurant.cuisine);
     setPriceLevel(restaurant.price_level);
-    setRatingLevel(restaurant.rating_level ?? "중");
+    setRatingLevel(normalizeRatingLevel(restaurant.rating_level));
     setImageUrl(restaurant.image_url ?? "");
     setMoodTags(restaurant.mood_tags);
     setManualEntry(true);
@@ -109,7 +109,7 @@ export function RestaurantFormPage() {
     setRegionDistrict(region.district);
     setArea(region.area || extractArea(place.address_name || place.road_address_name));
     setCuisine(extractCuisine(place.category_name));
-    setRatingLevel("중");
+    setRatingLevel("맛남");
     setImageUrl("");
     setNote((current) =>
       current.trim()
@@ -128,7 +128,7 @@ export function RestaurantFormPage() {
     setRegionCity("");
     setRegionDistrict("");
     setCuisine("");
-    setRatingLevel("중");
+    setRatingLevel("맛남");
     setImageUrl("");
   }
 
@@ -140,7 +140,7 @@ export function RestaurantFormPage() {
     setRegionCity("");
     setRegionDistrict("");
     setCuisine("");
-    setRatingLevel("중");
+    setRatingLevel("맛남");
     setImageUrl("");
   }
 
@@ -622,6 +622,15 @@ function parseRegionParts(source: string) {
     district,
     area: buildRegionArea(city, district),
   };
+}
+
+function normalizeRatingLevel(value: string | null | undefined): (typeof RATING_OPTIONS)[number] {
+  if (value === "상" || value === "진짜 맛집") return "인생맛집";
+  if (value === "중" || value === "맛있음") return "맛남";
+  if (value === "하" || value === "보통") return "쏘쏘";
+  return RATING_OPTIONS.includes(value as (typeof RATING_OPTIONS)[number])
+    ? (value as (typeof RATING_OPTIONS)[number])
+    : "맛남";
 }
 
 function normalizeCity(value: string) {
