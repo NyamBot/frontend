@@ -4,7 +4,7 @@ import { Crosshair, ExternalLink, MapPin, RefreshCw, X } from "lucide-react";
 import { listRestaurants, type Restaurant } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { RestaurantMap } from "../components/RestaurantMap";
-import { Button, Tag } from "../components/ui";
+import { Tag } from "../components/ui";
 import { getKakaoDirectionUrl } from "../lib/kakaoMap";
 import { cn } from "../lib/utils";
 
@@ -182,15 +182,6 @@ export function RestaurantMapPage() {
         )}
       </div>
 
-      {pinnedRestaurants.length === 0 && (
-        <div className="absolute inset-x-6 top-1/2 z-10 flex -translate-y-1/2 flex-col items-center gap-3 rounded-2xl border border-dashed border-zinc-200 bg-white/95 px-4 py-8 text-center shadow-sm">
-          <MapPin className="text-zinc-300" size={30} />
-          <div className="text-sm text-zinc-500">저장한 맛집이 지도에 표시돼요.</div>
-          <Button variant="secondary" onClick={() => navigate("/restaurants/new")}>
-            맛집 저장하기
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

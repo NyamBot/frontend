@@ -149,14 +149,6 @@ export function RestaurantsPage() {
             key={restaurant.id}
             className="flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white p-3.5"
           >
-            {restaurant.image_url && (
-              <img
-                src={restaurant.image_url}
-                alt=""
-                className="h-14 w-14 shrink-0 rounded-xl object-cover"
-                loading="lazy"
-              />
-            )}
             <button
               type="button"
               onClick={() => navigate(`/restaurants/${restaurant.id}`, { state: { restaurant } })}

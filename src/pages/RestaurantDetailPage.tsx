@@ -121,13 +121,6 @@ export function RestaurantDetailPage() {
         </div>
 
         <Card className="p-4">
-          {restaurant.image_url && (
-            <img
-              src={restaurant.image_url}
-              alt=""
-              className="mb-4 aspect-video w-full rounded-2xl object-cover"
-            />
-          )}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="truncate text-lg font-bold text-zinc-900">{restaurant.name}</h2>

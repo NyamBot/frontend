@@ -43,7 +43,6 @@ export function RestaurantFormPage() {
   const [cuisine, setCuisine] = useState("");
   const [priceLevel, setPriceLevel] = useState(PRICE_OPTIONS[1]);
   const [ratingLevel, setRatingLevel] = useState<(typeof RATING_OPTIONS)[number]>("맛남");
-  const [imageUrl, setImageUrl] = useState("");
   const [moodTags, setMoodTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [note, setNote] = useState("");
@@ -89,7 +88,6 @@ export function RestaurantFormPage() {
     setCuisine(restaurant.cuisine);
     setPriceLevel(restaurant.price_level);
     setRatingLevel(normalizeRatingLevel(restaurant.rating_level));
-    setImageUrl(restaurant.image_url ?? "");
     setMoodTags(restaurant.mood_tags);
     setManualEntry(true);
   }
@@ -110,7 +108,6 @@ export function RestaurantFormPage() {
     setArea(region.area || extractArea(place.address_name || place.road_address_name));
     setCuisine(extractCuisine(place.category_name));
     setRatingLevel("맛남");
-    setImageUrl("");
     setNote((current) =>
       current.trim()
         ? current
@@ -129,7 +126,6 @@ export function RestaurantFormPage() {
     setRegionDistrict("");
     setCuisine("");
     setRatingLevel("맛남");
-    setImageUrl("");
   }
 
   function changePlace() {
@@ -141,7 +137,6 @@ export function RestaurantFormPage() {
     setRegionDistrict("");
     setCuisine("");
     setRatingLevel("맛남");
-    setImageUrl("");
   }
 
   function updateRegion(nextCity: string, nextDistrict = "") {
@@ -200,7 +195,6 @@ export function RestaurantFormPage() {
             phone: target?.phone ?? null,
             latitude: target?.latitude ?? null,
             longitude: target?.longitude ?? null,
-            image_url: imageUrl.trim() || null,
             rating_level: ratingLevel,
           },
           token,
@@ -226,7 +220,6 @@ export function RestaurantFormPage() {
             phone: selectedPlace?.phone ?? null,
             latitude: selectedPlace ? Number(selectedPlace.y) : mapLocation?.latitude ?? null,
             longitude: selectedPlace ? Number(selectedPlace.x) : mapLocation?.longitude ?? null,
-            image_url: imageUrl.trim() || null,
             rating_level: ratingLevel,
           },
           token,
@@ -361,43 +354,31 @@ export function RestaurantFormPage() {
           />
         )}
 
-        {(selectedPlace || manualEntry || editing) && (
-          <>
-            <Field label="가격대">
-              <ChipRow>
-                {PRICE_OPTIONS.map((option) => (
-                  <ChoiceChip
-                    key={option}
-                    label={option}
-                    selected={priceLevel === option}
-                    onClick={() => setPriceLevel(option)}
-                  />
-                ))}
-              </ChipRow>
-            </Field>
-
-            <Field label="내 평가">
-              <ChipRow>
-                {RATING_OPTIONS.map((option) => (
-                  <ChoiceChip
-                    key={option}
-                    label={option}
-                    selected={ratingLevel === option}
-                    onClick={() => setRatingLevel(option)}
-                  />
-                ))}
-              </ChipRow>
-            </Field>
-
-            <Field label="사진 URL">
-              <TextInput
-                value={imageUrl}
-                onChange={(event) => setImageUrl(event.target.value)}
-                placeholder="https://..."
+        <Field label="가격대">
+          <ChipRow>
+            {PRICE_OPTIONS.map((option) => (
+              <ChoiceChip
+                key={option}
+                label={option}
+                selected={priceLevel === option}
+                onClick={() => setPriceLevel(option)}
               />
-            </Field>
-          </>
-        )}
+            ))}
+          </ChipRow>
+        </Field>
+
+        <Field label="내 평가">
+          <ChipRow>
+            {RATING_OPTIONS.map((option) => (
+              <ChoiceChip
+                key={option}
+                label={option}
+                selected={ratingLevel === option}
+                onClick={() => setRatingLevel(option)}
+              />
+            ))}
+          </ChipRow>
+        </Field>
 
         <Field label="분위기 태그">
           <div className="flex items-center gap-2">

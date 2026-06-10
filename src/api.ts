@@ -36,7 +36,6 @@ export type Restaurant = {
   phone: string | null;
   latitude: number | null;
   longitude: number | null;
-  image_url: string | null;
   rating_level: RatingLevel;
   note_count: number;
   created_at: string;
@@ -175,7 +174,6 @@ export async function createRestaurant(payload: {
   phone?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  image_url?: string | null;
   rating_level?: RatingLevel;
 }, token: string) {
   const response = await fetch(`${API_URL}/restaurants`, {
@@ -231,7 +229,6 @@ export async function updateRestaurant(
     phone?: string | null;
     latitude?: number | null;
     longitude?: number | null;
-    image_url?: string | null;
     rating_level?: RatingLevel;
   },
   token: string,
