@@ -64,7 +64,7 @@ export function ChatPage() {
     window.localStorage.setItem(ACTIVE_CHAT_SESSION_KEY, session.id);
     setSessionId(session.id);
     setMessages(session.messages);
-    setRecommendations([]);
+    setRecommendations(getLatestAssistantRecommendations(session.messages));
     setError(null);
   }
 
@@ -483,3 +483,12 @@ function TypingIndicator() {
   );
 }
 
+function getLatestAssistantRecommendations(messages: TasteAgentMessage[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role === "assistant" && message.metadata.recommendations?.length) {
+      return message.metadata.recommendations;
+    }
+  }
+  return [];
+}
