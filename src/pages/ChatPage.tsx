@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation as useRouteLocation } from "react-router-dom";
 import { AlertTriangle, MapPin, MapPinOff, RefreshCw, Send, SlidersHorizontal, Square, SquarePen } from "lucide-react";
 import {
+  cancelTasteAgentChat,
   chatTasteAgent,
   type RestaurantRecommendation,
   type TasteAgentMessage,
@@ -40,6 +41,9 @@ export function ChatPage() {
 
   const threadRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const activeRequestIdRef = useRef<string | null>(null);
+  const activeSessionIdRef = useRef<string | null>(null);
+  const suppressStoppedMessageRef = useRef(false);
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
@@ -47,7 +51,7 @@ export function ChatPage() {
 
   useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort();
+      stopResponse({ showStoppedMessage: false });
     };
   }, []);
 
@@ -96,16 +100,32 @@ export function ChatPage() {
   }
 
   function clearChat() {
-    stopResponse();
+    stopResponse({ showStoppedMessage: false });
     setSessionId(null);
     setMessages([]);
     setRecommendations([]);
     setError(null);
   }
 
-  function stopResponse() {
+  function stopResponse({ showStoppedMessage = true }: { showStoppedMessage?: boolean } = {}) {
+    const requestId = activeRequestIdRef.current;
+    const activeSessionId = activeSessionIdRef.current;
+    suppressStoppedMessageRef.current = !showStoppedMessage;
+    if (token && (requestId || activeSessionId)) {
+      void cancelTasteAgentChat(
+        {
+          request_id: requestId,
+          session_id: activeSessionId,
+        },
+        token,
+      ).catch(() => {
+        // The local abort still stops the UI even if the cancel request loses the race.
+      });
+    }
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
+    activeRequestIdRef.current = null;
+    activeSessionIdRef.current = null;
     setLoading(false);
   }
 
@@ -113,7 +133,11 @@ export function ChatPage() {
     if (!token || !rawQuery.trim() || loading) return;
     const asked = rawQuery.trim();
     const abortController = new AbortController();
+    const requestId = createRequestId();
     abortControllerRef.current = abortController;
+    activeRequestIdRef.current = requestId;
+    activeSessionIdRef.current = sessionId;
+    suppressStoppedMessageRef.current = false;
     setQuery("");
     setLoading(true);
     setError(null);
@@ -146,6 +170,7 @@ export function ChatPage() {
           query: asked,
           message: asked,
           session_id: sessionId,
+          request_id: requestId,
           cuisine: cuisine || null,
           price_level: priceLevel || null,
           tags: [],
@@ -157,7 +182,26 @@ export function ChatPage() {
         abortController.signal,
       );
       abortControllerRef.current = null;
+      activeRequestIdRef.current = null;
+      activeSessionIdRef.current = null;
       setSessionId(response.session_id);
+      if (response.cancelled) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `local-stopped-${prev.length}`,
+            session_id: response.session_id,
+            user_id: null,
+            role: "assistant",
+            content: response.answer,
+            retrieved_context: [],
+            metadata: { request_id: response.request_id },
+            created_at: new Date().toISOString(),
+          },
+        ]);
+        setRecommendations([]);
+        return;
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -168,6 +212,7 @@ export function ChatPage() {
           content: response.answer,
           retrieved_context: response.context,
           metadata: {
+            request_id: response.request_id,
             recommendation_count: response.recommendations.length,
             restaurant_names: response.recommendations.map((recommendation) => recommendation.restaurant.name),
             recommendations: response.recommendations,
@@ -178,6 +223,7 @@ export function ChatPage() {
       setRecommendations(response.recommendations);
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === "AbortError") {
+        if (suppressStoppedMessageRef.current) return;
         setMessages((prev) => [
           ...prev,
           {
@@ -196,6 +242,9 @@ export function ChatPage() {
       setError(caught instanceof Error ? caught.message : "맛집 추천에 실패했습니다.");
     } finally {
       abortControllerRef.current = null;
+      activeRequestIdRef.current = null;
+      activeSessionIdRef.current = null;
+      suppressStoppedMessageRef.current = false;
       setLoading(false);
     }
   }
@@ -384,7 +433,7 @@ export function ChatPage() {
             size="icon"
             disabled={!loading && !query.trim()}
             aria-label={loading ? "응답 중지" : "전송"}
-            onClick={loading ? stopResponse : undefined}
+            onClick={loading ? () => stopResponse() : undefined}
           >
             {loading ? <Square size={16} /> : <Send size={16} />}
           </Button>
@@ -505,4 +554,9 @@ function getLatestAssistantRecommendations(messages: TasteAgentMessage[]) {
     }
   }
   return [];
+}
+
+function createRequestId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }

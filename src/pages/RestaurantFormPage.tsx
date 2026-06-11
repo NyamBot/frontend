@@ -16,6 +16,30 @@ import { cn, extractArea, extractCuisine } from "../lib/utils";
 
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
 
+const CITY_SHORT_LABELS: Record<string, string> = {
+  강원특별자치도: "강원",
+  경기도: "경기",
+  경상남도: "경남",
+  경상북도: "경북",
+  광주광역시: "광주",
+  대구광역시: "대구",
+  대전광역시: "대전",
+  부산광역시: "부산",
+  서울특별시: "서울",
+  세종특별자치시: "세종",
+  울산광역시: "울산",
+  인천광역시: "인천",
+  전라남도: "전남",
+  전북특별자치도: "전북",
+  제주특별자치도: "제주",
+  충청남도: "충남",
+  충청북도: "충북",
+};
+
+function shortCityLabel(value: string) {
+  return CITY_SHORT_LABELS[value] ?? value;
+}
+
 export function RestaurantFormPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
@@ -489,66 +513,45 @@ function ManualFields({
         <Field label="식당명">
           <TextInput value={name} onChange={(event) => onNameChange(event.target.value)} />
         </Field>
-        <Field label="지역 선택">
-          <div className="grid grid-cols-2 gap-2">
-            <RegionSelect
-              ariaLabel="시 선택"
-              placeholder="시"
-              options={CITY_OPTIONS}
-              value={regionCity}
-              onChange={(value) => onRegionChange(value)}
-            />
-            <RegionSelect
-              ariaLabel="군·구 선택"
-              placeholder="군·구"
-              options={districtOptions}
-              value={regionDistrict}
-              disabled={!regionCity || districtOptions.length === 0}
-              onChange={(value) => onRegionChange(regionCity, value)}
-            />
-          </div>
-        </Field>
+        <div className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-3">
+          <section className="space-y-2">
+            <h3 className="text-xs font-bold text-zinc-500">지역 — 시·도</h3>
+            <ChipRow>
+              {CITY_OPTIONS.map((city) => (
+                <ChoiceChip
+                  key={city}
+                  variant="brand"
+                  label={shortCityLabel(city)}
+                  selected={regionCity === city}
+                  onClick={() => onRegionChange(regionCity === city ? "" : city)}
+                />
+              ))}
+            </ChipRow>
+          </section>
+          {regionCity && districtOptions.length > 0 && (
+            <section className="space-y-2">
+              <h3 className="text-xs font-bold text-zinc-500">군·구</h3>
+              <ChipRow>
+                {districtOptions.map((district) => (
+                  <ChoiceChip
+                    key={district}
+                    variant="brand"
+                    label={district}
+                    selected={regionDistrict === district}
+                    onClick={() =>
+                      onRegionChange(regionCity, regionDistrict === district ? "" : district)
+                    }
+                  />
+                ))}
+              </ChipRow>
+            </section>
+          )}
+        </div>
         <Field label="음식 종류">
           <TextInput value={cuisine} onChange={(event) => onCuisineChange(event.target.value)} />
         </Field>
       </div>
     </div>
-  );
-}
-
-function RegionSelect({
-  ariaLabel,
-  placeholder,
-  options,
-  value,
-  onChange,
-  disabled,
-}: {
-  ariaLabel: string;
-  placeholder: string;
-  options: string[];
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <select
-      aria-label={ariaLabel}
-      value={value}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-      className={cn(
-        "min-w-0 rounded-xl border border-zinc-200 bg-white px-2 py-2 text-xs font-medium outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-200 disabled:bg-zinc-50 disabled:text-zinc-300",
-        value ? "text-zinc-800" : "text-zinc-400",
-      )}
-    >
-      <option value="">{placeholder}</option>
-      {options.map((option) => (
-        <option key={option} value={option} className="text-zinc-800">
-          {option}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -560,10 +563,12 @@ function ChoiceChip({
   label,
   selected,
   onClick,
+  variant = "zinc",
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
+  variant?: "zinc" | "brand";
 }) {
   return (
     <button
@@ -573,7 +578,9 @@ function ChoiceChip({
         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         selected
           ? "border-brand-300 bg-brand-100 text-brand-700"
-          : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
+          : variant === "brand"
+            ? "border-brand-200 bg-brand-50 text-brand-700 hover:border-brand-300 hover:bg-brand-100"
+            : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
       )}
     >
       {label}
