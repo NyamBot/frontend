@@ -15,8 +15,6 @@ export type User = {
   last_login_at: string | null;
 };
 
-export type RatingLevel = "인생맛집" | "맛남" | "쏘쏘";
-
 export type Restaurant = {
   id: string;
   user_id: string | null;
@@ -36,7 +34,6 @@ export type Restaurant = {
   phone: string | null;
   latitude: number | null;
   longitude: number | null;
-  rating_level: RatingLevel;
   note_count: number;
   created_at: string;
 };
@@ -174,7 +171,6 @@ export async function createRestaurant(payload: {
   phone?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  rating_level?: RatingLevel;
 }, token: string) {
   const response = await fetch(`${API_URL}/restaurants`, {
     method: "POST",
@@ -187,14 +183,22 @@ export async function createRestaurant(payload: {
 
 export async function listRestaurants(
   token: string,
-  filters: { city?: string; district?: string; town?: string; query?: string; rating_level?: string } = {},
+  filters: {
+    city?: string;
+    district?: string;
+    town?: string;
+    query?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
 ) {
   const params = new URLSearchParams();
   if (filters.city) params.set("city", filters.city);
   if (filters.district) params.set("district", filters.district);
   if (filters.town) params.set("town", filters.town);
   if (filters.query) params.set("query", filters.query);
-  if (filters.rating_level) params.set("rating_level", filters.rating_level);
+  if (filters.limit) params.set("limit", String(filters.limit));
+  if (filters.offset) params.set("offset", String(filters.offset));
   const query = params.toString();
   const response = await fetch(`${API_URL}/restaurants${query ? `?${query}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -229,7 +233,6 @@ export async function updateRestaurant(
     phone?: string | null;
     latitude?: number | null;
     longitude?: number | null;
-    rating_level?: RatingLevel;
   },
   token: string,
 ) {
@@ -286,11 +289,12 @@ export async function chatTasteAgent(payload: {
   latitude?: number | null;
   longitude?: number | null;
   limit?: number;
-}, token: string) {
+}, token: string, signal?: AbortSignal) {
   const response = await fetch(`${API_URL}/restaurants/chat`, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(payload),
+    signal,
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to ask taste agent"));
   return response.json() as Promise<{

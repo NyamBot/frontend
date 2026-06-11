@@ -11,7 +11,6 @@ export function Mascot({ size = 220 }: { size?: number }) {
       role="img"
       aria-label="NyamBot 캐릭터"
     >
-      <ellipse cx="110" cy="200" rx="62" ry="7" fill="rgba(46,77,24,0.18)" />
       <g>
         <path
           d="M110 46 C 96 26 118 14 130 22 C 134 38 122 50 110 48 Z"
@@ -48,7 +47,14 @@ export function Mascot({ size = 220 }: { size?: number }) {
 }
 
 /** 작은 마스코트 — 아바타/엠티 스테이트용 */
-export function MiniMascot({ className }: { className?: string }) {
+export function MiniMascot({
+  className,
+  crying = false,
+}: {
+  className?: string;
+  /** 울고 있는 병아리 — 눈물 */
+  crying?: boolean;
+}) {
   return (
     <svg
       className={className}
@@ -57,14 +63,27 @@ export function MiniMascot({ className }: { className?: string }) {
       role="img"
       aria-hidden="true"
     >
-      <ellipse cx="40" cy="74" rx="22" ry="3" fill="rgba(46,77,24,0.15)" />
       {/* 작은 머리가닥 3개 */}
-      <path d="M37 21 Q 34 14 38 12" stroke="#f4c01f" strokeWidth="2.4" strokeLinecap="round" fill="none" />
-      <path d="M40 21 Q 40 13 40 11" stroke="#f4c01f" strokeWidth="2.4" strokeLinecap="round" fill="none" />
-      <path d="M43 21 Q 46 14 42 12" stroke="#f4c01f" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+      <path d="M37 21 Q 34 14 38 12" stroke="#ffdd5e" strokeWidth="1.0" strokeLinecap="round" fill="none" />
+      <path d="M40 21 Q 40 13 40 11" stroke="#ffdd5e" strokeWidth="1.0" strokeLinecap="round" fill="none" />
+      <path d="M43 21 Q 46 14 42 12" stroke="#ffdd5e" strokeWidth="1.0" strokeLinecap="round" fill="none" />
       <ellipse cx="40" cy="46" rx="28" ry="24" fill="#ffd84d" stroke="#e0a01a" strokeWidth="1.6" />
+      {crying && (
+        <>
+          {/* 살짝 처진 눈썹 */}
+          <path d="M25 41 Q 29 39.5 32.5 41.5" stroke="#2a2d1b" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+          <path d="M55 41 Q 51 39.5 47.5 41.5" stroke="#2a2d1b" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+        </>
+      )}
       <ellipse cx="30" cy="46" rx="2.6" ry="3.4" fill="#2a2d1b" />
       <ellipse cx="50" cy="46" rx="2.6" ry="3.4" fill="#2a2d1b" />
+      {crying && (
+        <>
+          {/* 눈물 방울 */}
+          <path d="M29 50 c -2.4 3.2 -2.4 5.8 0 6.8 c 2.4 -1 2.4 -3.6 0 -6.8 Z" fill="#7cc6f0" />
+          <path d="M51 50 c -2.4 3.2 -2.4 5.8 0 6.8 c 2.4 -1 2.4 -3.6 0 -6.8 Z" fill="#7cc6f0" />
+        </>
+      )}
       {/* 부리 — 가로로 길게 (아따맘마 입술 느낌) */}
       <path d="M32 52 L48 52 L40 49 Z" fill="#ffae2b" />
       <path d="M32 52 L48 52 L40 55 Z" fill="#ef9018" />

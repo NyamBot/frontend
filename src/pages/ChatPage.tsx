@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation as useRouteLocation } from "react-router-dom";
-import { AlertTriangle, MapPin, MapPinOff, RefreshCw, Send, SlidersHorizontal, Sparkles, SquarePen } from "lucide-react";
+import { AlertTriangle, MapPin, MapPinOff, RefreshCw, Send, SlidersHorizontal, Square, SquarePen } from "lucide-react";
 import {
   chatTasteAgent,
   type RestaurantRecommendation,
@@ -39,10 +39,17 @@ export function ChatPage() {
   const [error, setError] = useState<string | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, recommendations, loading]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     requestCurrentLocation();
@@ -89,15 +96,24 @@ export function ChatPage() {
   }
 
   function clearChat() {
+    stopResponse();
     setSessionId(null);
     setMessages([]);
     setRecommendations([]);
     setError(null);
   }
 
-  async function handleAsk() {
-    if (!token || !query.trim() || loading) return;
-    const asked = query.trim();
+  function stopResponse() {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setLoading(false);
+  }
+
+  async function handleAsk(rawQuery: string = query) {
+    if (!token || !rawQuery.trim() || loading) return;
+    const asked = rawQuery.trim();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
     setQuery("");
     setLoading(true);
     setError(null);
@@ -138,7 +154,9 @@ export function ChatPage() {
           limit: 3,
         },
         token,
+        abortController.signal,
       );
+      abortControllerRef.current = null;
       setSessionId(response.session_id);
       setMessages((prev) => [
         ...prev,
@@ -159,8 +177,25 @@ export function ChatPage() {
       ]);
       setRecommendations(response.recommendations);
     } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `local-stopped-${prev.length}`,
+            session_id: sessionId,
+            user_id: null,
+            role: "assistant",
+            content: "응답 생성을 중지했어요.",
+            retrieved_context: [],
+            metadata: {},
+            created_at: new Date().toISOString(),
+          },
+        ]);
+        return;
+      }
       setError(caught instanceof Error ? caught.message : "맛집 추천에 실패했습니다.");
     } finally {
+      abortControllerRef.current = null;
       setLoading(false);
     }
   }
@@ -177,8 +212,8 @@ export function ChatPage() {
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
               showFilters
-                ? "border-brand-300 bg-brand-50 text-leaf-600"
-                : "border-zinc-200 text-zinc-500 hover:bg-zinc-50",
+                ? "border-brand-300 bg-brand-100 text-brand-700"
+                : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100",
             )}
           >
             <SlidersHorizontal size={13} />
@@ -206,12 +241,12 @@ export function ChatPage() {
             className={cn(
               "inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-colors",
               !useLocation
-                ? "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
+                ? "bg-brand-50 text-brand-700 hover:bg-brand-100"
                 : locationStatus === "ready"
-                  ? "bg-brand-50 text-leaf-600 hover:bg-brand-100"
+                  ? "bg-brand-100 text-brand-700 hover:bg-brand-200"
                   : locationStatus === "failed"
                     ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
-                    : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200",
+                    : "bg-brand-50 text-brand-700 hover:bg-brand-100",
             )}
           >
             {!useLocation ? (
@@ -297,19 +332,18 @@ export function ChatPage() {
         {!hasThread && !loading && (
           <div className="flex flex-col items-center gap-2 py-10 text-center">
             <MiniMascot className="h-14 w-14" />
-            <strong className="text-sm font-semibold text-zinc-700">아직 추천 결과가 없어요.</strong>
+            <strong className="text-sm font-semibold text-zinc-700">오늘은 어디서 먹을까요?</strong>
             <span className="text-xs text-zinc-400">
-              아래 입력창에서 질문하면 답변과 추천 카드가 나타나요.
+              먹고 싶은 메뉴나 분위기를 말해주면 딱 맞는 맛집을 찾아드릴게요.
             </span>
             <div className="mt-2 flex flex-wrap justify-center gap-2">
               {QUICK_QUERIES.map((quickQuery) => (
                 <button
                   key={quickQuery}
                   type="button"
-                  onClick={() => setQuery(quickQuery)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 hover:border-brand-300 hover:bg-brand-50"
+                  onClick={() => void handleAsk(quickQuery)}
+                  className="inline-flex items-center rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs text-brand-700 hover:border-brand-300 hover:bg-brand-100"
                 >
-                  <Sparkles size={12} />
                   {quickQuery}
                 </button>
               ))}
@@ -345,8 +379,14 @@ export function ChatPage() {
             placeholder="예: 성수에서 조용한 데이트 맛집 골라줘"
             className="max-h-32 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-zinc-800 placeholder:text-zinc-400 outline-none"
           />
-          <Button type="submit" size="icon" disabled={loading || !query.trim()} aria-label="전송">
-            {loading ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+          <Button
+            type={loading ? "button" : "submit"}
+            size="icon"
+            disabled={!loading && !query.trim()}
+            aria-label={loading ? "응답 중지" : "전송"}
+            onClick={loading ? stopResponse : undefined}
+          >
+            {loading ? <Square size={16} /> : <Send size={16} />}
           </Button>
         </form>
       </div>
@@ -383,8 +423,8 @@ function ChoiceChip({
       className={cn(
         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         selected
-          ? "border-brand-300 bg-brand-50 text-leaf-600"
-          : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
+          ? "border-brand-300 bg-brand-100 text-brand-700"
+          : "border-brand-200 bg-brand-50 text-brand-700 hover:border-brand-300 hover:bg-brand-100",
       )}
     >
       {label}
@@ -407,7 +447,7 @@ function Bubble({
       <div className={cn("flex max-w-[88%] gap-2.5", isUser && "flex-row-reverse")}>
         {!isUser && (
           <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-            <MiniMascot className="h-8 w-8" />
+            <MiniMascot className="h-8 w-8 nyam-bob" />
           </div>
         )}
         <div className={cn("min-w-0 space-y-1", isUser && "text-right")}>

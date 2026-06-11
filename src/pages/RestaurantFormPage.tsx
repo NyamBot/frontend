@@ -15,8 +15,6 @@ import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
 import { cn, extractArea, extractCuisine } from "../lib/utils";
 
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
-const RATING_OPTIONS = ["인생맛집", "맛남", "쏘쏘"] as const;
-const TAG_EXAMPLES = ["조용한", "혼밥", "재방문"];
 
 export function RestaurantFormPage() {
   const { token } = useAuth();
@@ -42,7 +40,6 @@ export function RestaurantFormPage() {
   const [regionDistrict, setRegionDistrict] = useState("");
   const [cuisine, setCuisine] = useState("");
   const [priceLevel, setPriceLevel] = useState(PRICE_OPTIONS[1]);
-  const [ratingLevel, setRatingLevel] = useState<(typeof RATING_OPTIONS)[number]>("맛남");
   const [moodTags, setMoodTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [note, setNote] = useState("");
@@ -87,9 +84,14 @@ export function RestaurantFormPage() {
     setArea(region.area || restaurant.area);
     setCuisine(restaurant.cuisine);
     setPriceLevel(restaurant.price_level);
-    setRatingLevel(normalizeRatingLevel(restaurant.rating_level));
     setMoodTags(restaurant.mood_tags);
-    setManualEntry(true);
+    if (restaurant.kakao_place_id) {
+      setSelectedPlace(restaurantToPlace(restaurant));
+      setManualEntry(false);
+    } else {
+      setSelectedPlace(null);
+      setManualEntry(true);
+    }
   }
 
   function selectPlace(place: KakaoPlace) {
@@ -107,7 +109,6 @@ export function RestaurantFormPage() {
     setRegionDistrict(region.district);
     setArea(region.area || extractArea(place.address_name || place.road_address_name));
     setCuisine(extractCuisine(place.category_name));
-    setRatingLevel("맛남");
     setNote((current) =>
       current.trim()
         ? current
@@ -125,7 +126,6 @@ export function RestaurantFormPage() {
     setRegionCity("");
     setRegionDistrict("");
     setCuisine("");
-    setRatingLevel("맛남");
   }
 
   function changePlace() {
@@ -136,7 +136,6 @@ export function RestaurantFormPage() {
     setRegionCity("");
     setRegionDistrict("");
     setCuisine("");
-    setRatingLevel("맛남");
   }
 
   function updateRegion(nextCity: string, nextDistrict = "") {
@@ -177,6 +176,27 @@ export function RestaurantFormPage() {
     setError(null);
     try {
       if (editing && id) {
+        const placeChanged = Boolean(selectedPlace) && selectedPlace?.id !== (target?.kakao_place_id ?? "");
+        const placeFields =
+          placeChanged && selectedPlace
+            ? {
+                kakao_place_id: selectedPlace.id || null,
+                kakao_place_url: selectedPlace.place_url || null,
+                address: selectedPlace.address_name || null,
+                road_address: selectedPlace.road_address_name || null,
+                phone: selectedPlace.phone || null,
+                latitude: selectedPlace.y ? Number(selectedPlace.y) : null,
+                longitude: selectedPlace.x ? Number(selectedPlace.x) : null,
+              }
+            : {
+                kakao_place_id: target?.kakao_place_id ?? null,
+                kakao_place_url: target?.kakao_place_url ?? null,
+                address: target?.address ?? null,
+                road_address: target?.road_address ?? null,
+                phone: target?.phone ?? null,
+                latitude: target?.latitude ?? null,
+                longitude: target?.longitude ?? null,
+              };
         const updated = await updateRestaurant(
           id,
           {
@@ -188,14 +208,7 @@ export function RestaurantFormPage() {
             cuisine,
             price_level: priceLevel,
             mood_tags: moodTags,
-            kakao_place_id: target?.kakao_place_id ?? null,
-            kakao_place_url: target?.kakao_place_url ?? null,
-            address: target?.address ?? null,
-            road_address: target?.road_address ?? null,
-            phone: target?.phone ?? null,
-            latitude: target?.latitude ?? null,
-            longitude: target?.longitude ?? null,
-            rating_level: ratingLevel,
+            ...placeFields,
           },
           token,
         );
@@ -220,7 +233,6 @@ export function RestaurantFormPage() {
             phone: selectedPlace?.phone ?? null,
             latitude: selectedPlace ? Number(selectedPlace.y) : mapLocation?.latitude ?? null,
             longitude: selectedPlace ? Number(selectedPlace.x) : mapLocation?.longitude ?? null,
-            rating_level: ratingLevel,
           },
           token,
         );
@@ -241,6 +253,7 @@ export function RestaurantFormPage() {
           <Button
             variant="ghost"
             size="icon"
+            className="text-zinc-500! hover:bg-zinc-100! hover:text-zinc-700!"
             onClick={() => navigate(editing && id ? `/restaurants/${id}` : "/restaurants")}
             aria-label="뒤로"
           >
@@ -248,7 +261,7 @@ export function RestaurantFormPage() {
           </Button>
           <div>
             <h2 className="text-sm font-semibold text-zinc-900">
-              {editing ? "맛집 수정" : "새 맛집 작성"}
+              {editing ? "맛집 수정" : "맛집 작성"}
             </h2>
             <p className="text-[11px] text-zinc-400">
               {editing
@@ -258,13 +271,11 @@ export function RestaurantFormPage() {
           </div>
         </div>
 
-        {!editing && (
-          <>
-            {selectedPlace ? (
-              <div className="rounded-2xl border border-brand-300 bg-brand-50 p-3">
+        {selectedPlace ? (
+              <div className="rounded-2xl border border-brand-300 bg-white p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <span className="text-[11px] font-semibold text-leaf-600">선택한 장소</span>
+                    <span className="text-[11px] font-semibold text-brand-600">선택한 장소</span>
                     <strong className="mt-1 block truncate text-sm text-zinc-900">
                       {selectedPlace.place_name}
                     </strong>
@@ -273,7 +284,12 @@ export function RestaurantFormPage() {
                       {selectedPlace.road_address_name || selectedPlace.address_name}
                     </small>
                   </div>
-                  <Button variant="secondary" size="sm" onClick={changePlace}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="border-zinc-300! bg-white! text-zinc-600! hover:bg-zinc-50!"
+                    onClick={changePlace}
+                  >
                     장소 변경
                   </Button>
                 </div>
@@ -293,7 +309,7 @@ export function RestaurantFormPage() {
                 showBack
               />
             ) : (
-              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 p-3">
+              <div>
                 <div className="flex items-end gap-2">
                   <Field label="카카오 장소 검색" className="flex-1">
                     <TextInput
@@ -308,12 +324,20 @@ export function RestaurantFormPage() {
                       placeholder="예: 성수 파스타"
                     />
                   </Field>
-                  <Button variant="secondary" disabled={placeLoading} onClick={handleSearchKakao}>
+                  <Button
+                    disabled={placeLoading}
+                    onClick={handleSearchKakao}
+                    aria-label="검색"
+                  >
                     <Search size={15} />
-                    {placeLoading ? "검색 중" : "검색"}
                   </Button>
                 </div>
-                <Button className="mt-2 w-full" variant="ghost" size="sm" onClick={startManualEntry}>
+                <Button
+                  className="mt-2 px-0 text-zinc-500! hover:bg-transparent! hover:text-zinc-700! hover:underline"
+                  variant="ghost"
+                  size="sm"
+                  onClick={startManualEntry}
+                >
                   검색에 없으면 직접 입력
                 </Button>
                 {kakaoPlaces.length > 0 && (
@@ -323,7 +347,7 @@ export function RestaurantFormPage() {
                         key={place.id}
                         type="button"
                         onClick={() => selectPlace(place)}
-                        className="block w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-left transition-colors hover:bg-zinc-50"
+                        className="block w-full rounded-xl border border-brand-200 bg-white p-2.5 text-left transition-colors hover:border-brand-300 hover:bg-brand-50"
                       >
                         <strong className="block text-sm text-zinc-900">{place.place_name}</strong>
                         <span className="text-[11px] text-zinc-500">{place.category_name}</span>
@@ -336,23 +360,6 @@ export function RestaurantFormPage() {
                 )}
               </div>
             )}
-          </>
-        )}
-
-        {editing && (
-          <ManualFields
-            name={name}
-            area={area}
-            regionCity={regionCity}
-            regionDistrict={regionDistrict}
-            cuisine={cuisine}
-            onNameChange={setName}
-            onAreaChange={setArea}
-            onRegionChange={updateRegion}
-            onCuisineChange={setCuisine}
-            onBack={() => undefined}
-          />
-        )}
 
         <Field label="가격대">
           <ChipRow>
@@ -362,19 +369,6 @@ export function RestaurantFormPage() {
                 label={option}
                 selected={priceLevel === option}
                 onClick={() => setPriceLevel(option)}
-              />
-            ))}
-          </ChipRow>
-        </Field>
-
-        <Field label="내 평가">
-          <ChipRow>
-            {RATING_OPTIONS.map((option) => (
-              <ChoiceChip
-                key={option}
-                label={option}
-                selected={ratingLevel === option}
-                onClick={() => setRatingLevel(option)}
               />
             ))}
           </ChipRow>
@@ -393,20 +387,16 @@ export function RestaurantFormPage() {
               }}
               placeholder="예: #조용한"
             />
-            <Button variant="secondary" size="icon" onClick={() => addMoodTag()} aria-label="태그 추가">
+            <Button
+              variant="secondary"
+              size="icon"
+              className="border-zinc-300! bg-white! text-zinc-600! hover:bg-zinc-50!"
+              onClick={() => addMoodTag()}
+              aria-label="태그 추가"
+            >
               <Plus size={16} />
             </Button>
           </div>
-          <ChipRow>
-            {TAG_EXAMPLES.map((tag) => (
-              <ChoiceChip
-                key={tag}
-                label={`#${tag}`}
-                selected={moodTags.includes(tag)}
-                onClick={() => addMoodTag(tag)}
-              />
-            ))}
-          </ChipRow>
           {moodTags.length > 0 && (
             <ChipRow>
               {moodTags.map((tag) => (
@@ -414,7 +404,7 @@ export function RestaurantFormPage() {
                   key={tag}
                   type="button"
                   onClick={() => removeMoodTag(tag)}
-                  className="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-medium text-leaf-600"
+                  className="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
                 >
                   #{tag}
                   <X size={12} />
@@ -442,7 +432,7 @@ export function RestaurantFormPage() {
         )}
 
         <Button className="w-full" disabled={saving || !canSave} onClick={handleSave}>
-          {saving ? "저장 중..." : editing ? "저장" : "맛집 저장"}
+          {saving ? "저장 중..." : "저장"}
         </Button>
       </div>
     </div>
@@ -480,11 +470,17 @@ function ManualFields({
   );
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-3">
+    <div className="rounded-2xl border border-brand-100 bg-brand-50 p-3">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-semibold text-zinc-600">직접 입력</span>
         {showBack && (
-          <Button variant="ghost" size="icon" onClick={onBack} aria-label="카카오 검색으로 돌아가기">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-zinc-500! hover:bg-zinc-100! hover:text-zinc-700!"
+            onClick={onBack}
+            aria-label="카카오 검색으로 돌아가기"
+          >
             <ArrowLeft size={16} />
           </Button>
         )}
@@ -512,18 +508,9 @@ function ManualFields({
             />
           </div>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="저장 지역명">
-            <TextInput
-              value={area}
-              onChange={(event) => onAreaChange(event.target.value)}
-              placeholder="예: 서울특별시 성동구 성수동1가"
-            />
-          </Field>
-          <Field label="음식 종류">
-            <TextInput value={cuisine} onChange={(event) => onCuisineChange(event.target.value)} />
-          </Field>
-        </div>
+        <Field label="음식 종류">
+          <TextInput value={cuisine} onChange={(event) => onCuisineChange(event.target.value)} />
+        </Field>
       </div>
     </div>
   );
@@ -585,13 +572,27 @@ function ChoiceChip({
       className={cn(
         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         selected
-          ? "border-brand-300 bg-brand-50 text-leaf-600"
+          ? "border-brand-300 bg-brand-100 text-brand-700"
           : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
       )}
     >
       {label}
     </button>
   );
+}
+
+function restaurantToPlace(restaurant: Restaurant): KakaoPlace {
+  return {
+    id: restaurant.kakao_place_id ?? "",
+    place_name: restaurant.name,
+    category_name: restaurant.cuisine,
+    address_name: restaurant.address ?? restaurant.area,
+    road_address_name: restaurant.road_address ?? "",
+    phone: restaurant.phone ?? "",
+    place_url: restaurant.kakao_place_url ?? "",
+    x: restaurant.longitude != null ? String(restaurant.longitude) : "",
+    y: restaurant.latitude != null ? String(restaurant.latitude) : "",
+  };
 }
 
 function parseRegionParts(source: string) {
@@ -605,14 +606,6 @@ function parseRegionParts(source: string) {
   };
 }
 
-function normalizeRatingLevel(value: string | null | undefined): (typeof RATING_OPTIONS)[number] {
-  if (value === "상" || value === "진짜 맛집") return "인생맛집";
-  if (value === "중" || value === "맛있음") return "맛남";
-  if (value === "하" || value === "보통") return "쏘쏘";
-  return RATING_OPTIONS.includes(value as (typeof RATING_OPTIONS)[number])
-    ? (value as (typeof RATING_OPTIONS)[number])
-    : "맛남";
-}
 
 function normalizeCity(value: string) {
   const aliases: Record<string, string> = {

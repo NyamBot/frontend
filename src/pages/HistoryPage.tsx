@@ -35,7 +35,7 @@ export function HistoryPage() {
           <button
             type="button"
             onClick={refresh}
-            className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-600"
+            className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
           >
             <RefreshCw size={13} />
             새로고침
@@ -55,7 +55,7 @@ export function HistoryPage() {
                 key={session.id}
                 type="button"
                 onClick={() => navigate(`/history/${session.id}`, { state: { session } })}
-                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-zinc-50"
+                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-brand-50"
               >
                 <div className="min-w-0 flex-1">
                   <div className="line-clamp-1 text-sm font-medium text-zinc-900">

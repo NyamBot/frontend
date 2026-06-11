@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { listTasteAgentSessions, type TasteAgentMessage, type TasteAgentSession } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
@@ -60,7 +60,6 @@ export function HistoryDetailPage() {
           onClick={() => navigate("/chat", { state: { session } })}
           disabled={!session.messages.length}
         >
-          <MessageCircle size={14} />
           이어서 대화
         </Button>
       </div>

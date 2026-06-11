@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, Plus, RotateCcw } from "lucide-react";
 import { cn } from "../lib/utils";
 import { listRestaurants, type Restaurant } from "../api";
 import { useAuth } from "../auth/AuthContext";
@@ -8,7 +7,7 @@ import { MiniMascot } from "../components/Mascot";
 import { Button, Tag, TextInput } from "../components/ui";
 import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
 
-const RATING_OPTIONS = ["인생맛집", "맛남", "쏘쏘"] as const;
+const PAGE_SIZE = 50;
 
 export function RestaurantsPage() {
   const { token } = useAuth();
@@ -17,28 +16,50 @@ export function RestaurantsPage() {
   const [selectedCity, setSelectedCity] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedRating, setSelectedRating] = useState("");
+  const [showRegions, setShowRegions] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, selectedCity, selectedDistrict, searchQuery, selectedRating]);
+  }, [token, selectedCity, selectedDistrict, searchQuery]);
 
   async function refresh() {
     if (!token) return;
     try {
-      setRestaurants(
-        await listRestaurants(token, {
-          city: selectedCity,
-          district: selectedDistrict,
-          query: searchQuery.trim(),
-          rating_level: selectedRating,
-        }),
-      );
+      setRestaurants(await loadRestaurantPage(0));
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "저장된 맛집을 불러오지 못했습니다.");
+    }
+  }
+
+  async function loadRestaurantPage(offset: number) {
+    if (!token) return [];
+    const page = await listRestaurants(token, {
+      city: selectedCity,
+      district: selectedDistrict,
+      query: searchQuery.trim(),
+      limit: PAGE_SIZE + 1,
+      offset,
+    });
+    setHasMore(page.length > PAGE_SIZE);
+    return page.slice(0, PAGE_SIZE);
+  }
+
+  async function loadMore() {
+    if (!token || loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    setError(null);
+    try {
+      const nextPage = await loadRestaurantPage(restaurants.length);
+      setRestaurants((current) => [...current, ...nextPage]);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "맛집을 더 불러오지 못했습니다.");
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -50,92 +71,78 @@ export function RestaurantsPage() {
       })),
     [restaurants],
   );
-  const cityOptions = useMemo(
-    () => unique([...CITY_OPTIONS, ...locationRows.map((row) => row.location.city)]),
-    [locationRows],
-  );
-  const districtOptions = useMemo(
-    () =>
-      selectedCity
-        ? unique([...(DISTRICT_OPTIONS_BY_CITY[selectedCity] ?? []), ...locationRows
-            .filter((row) => row.location.city === selectedCity)
-            .map((row) => row.location.district)])
-        : [],
-    [locationRows, selectedCity],
-  );
+  const cityOptions = CITY_OPTIONS;
+  const districtOptions = selectedCity ? DISTRICT_OPTIONS_BY_CITY[selectedCity] ?? [] : [];
   const filteredRows = locationRows.filter((row) => {
     if (!regionMatches(row.location.city, selectedCity)) return false;
     if (!regionMatches(row.location.district, selectedDistrict)) return false;
     return true;
   });
-  const hasLocationFilter = Boolean(selectedCity || selectedDistrict || searchQuery.trim() || selectedRating);
+  const hasLocationFilter = Boolean(selectedCity || selectedDistrict || searchQuery.trim());
 
   return (
     <div className="flex h-full flex-col">
       <div className="tf-scroll flex-1 overflow-y-auto">
         <div className="flex flex-col gap-3 p-4">
         {(restaurants.length > 0 || hasLocationFilter) && (
-          <section className="space-y-2 rounded-2xl border border-zinc-200 bg-white p-3">
+          <div className="space-y-2">
             <TextInput
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="식당명, 지역, 음식 종류, 태그 검색"
             />
-            <div className="flex flex-wrap gap-1.5">
-              {RATING_OPTIONS.map((rating) => (
-                <button
-                  key={rating}
-                  type="button"
-                  onClick={() => setSelectedRating((current) => (current === rating ? "" : rating))}
-                  className={cn(
-                    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                    selectedRating === rating
-                      ? "border-brand-300 bg-brand-50 text-leaf-600"
-                      : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
-                  )}
-                >
-                  {rating}
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
-        {(restaurants.length > 0 || hasLocationFilter) && (
-          <section className="flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white p-3">
-            <RegionSelect
-              ariaLabel="시"
-              placeholder="시 전체"
-              options={cityOptions}
-              value={selectedCity}
-              onChange={(value) => {
-                setSelectedCity(value);
-                setSelectedDistrict("");
-              }}
-            />
-            <RegionSelect
-              ariaLabel="군·구"
-              placeholder="군·구"
-              options={districtOptions}
-              value={selectedDistrict}
-              disabled={!selectedCity || districtOptions.length === 0}
-              onChange={setSelectedDistrict}
-            />
-            {hasLocationFilter && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedCity("");
-                  setSelectedDistrict("");
-                  setSearchQuery("");
-                  setSelectedRating("");
-                }}
-                aria-label="지역 필터 초기화"
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
-              >
-                <RotateCcw size={15} />
-              </button>
+            <button
+              type="button"
+              onClick={() => setShowRegions((value) => !value)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                showRegions || selectedCity
+                  ? "border-brand-300 bg-brand-100 text-brand-700"
+                  : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100",
+              )}
+            >
+              {selectedCity ? `${selectedCity}${selectedDistrict ? ` ${selectedDistrict}` : ""}` : "지역"}
+            </button>
+            {showRegions && (
+              <>
+                {cityOptions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {cityOptions.map((city) => (
+                      <FilterChip
+                        key={city}
+                        label={city}
+                        selected={selectedCity === city}
+                        onClick={() => {
+                          const next = selectedCity === city ? "" : city;
+                          setSelectedCity(next);
+                          setSelectedDistrict("");
+                          if (next && (DISTRICT_OPTIONS_BY_CITY[next] ?? []).length === 0) {
+                            setShowRegions(false);
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+                {selectedCity && districtOptions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {districtOptions.map((district) => (
+                      <FilterChip
+                        key={district}
+                        label={district}
+                        selected={selectedDistrict === district}
+                        onClick={() => {
+                          const next = selectedDistrict === district ? "" : district;
+                          setSelectedDistrict(next);
+                          if (next) setShowRegions(false);
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
-          </section>
+          </div>
         )}
 
         {error && (
@@ -152,15 +159,12 @@ export function RestaurantsPage() {
             <button
               type="button"
               onClick={() => navigate(`/restaurants/${restaurant.id}`, { state: { restaurant } })}
-              className="min-w-0 flex-1 text-left"
+              className="min-w-0 flex-1 text-left transition-colors hover:text-brand-700"
             >
               <div className="flex items-center gap-2">
                 <strong className="block min-w-0 flex-1 truncate text-sm font-semibold text-zinc-900">
                   {restaurant.name}
                 </strong>
-                <span className="shrink-0 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-leaf-600">
-                  {restaurant.rating_level}
-                </span>
               </div>
               <span className="text-xs text-zinc-500">
                 {restaurant.area} · {restaurant.cuisine} · {restaurant.price_level}
@@ -178,7 +182,7 @@ export function RestaurantsPage() {
 
         {!restaurants.length && !hasLocationFilter && !error && (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
-            <MiniMascot className="h-14 w-14" />
+            <MiniMascot className="h-14 w-14" crying />
             <span className="text-sm text-zinc-400">
               아직 저장된 맛집이 없어요.
               <br />
@@ -188,65 +192,55 @@ export function RestaurantsPage() {
         )}
 
         {hasLocationFilter && filteredRows.length === 0 && !error && (
-          <div className="rounded-2xl border border-dashed border-zinc-200 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-400">
-            선택한 지역에 저장된 맛집이 없어요.
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
+            <MiniMascot className="h-14 w-14" crying />
+            <span className="text-sm text-zinc-400">선택한 지역에 저장된 맛집이 없어요.</span>
           </div>
+        )}
+        {hasMore && filteredRows.length > 0 && (
+          <Button
+            className="w-full"
+            variant="secondary"
+            disabled={loadingMore}
+            onClick={() => void loadMore()}
+          >
+            {loadingMore ? "불러오는 중..." : "더 보기"}
+          </Button>
         )}
 
       </div>
       </div>
       <div className="shrink-0 border-t border-zinc-200 bg-white p-4">
         <Button className="w-full" onClick={() => navigate("/restaurants/new")}>
-          <Plus size={16} />
-          새 맛집 작성
+          맛집 작성
         </Button>
       </div>
     </div>
   );
 }
 
-function RegionSelect({
-  ariaLabel,
-  placeholder,
-  options,
-  value,
-  onChange,
-  disabled,
+function FilterChip({
+  label,
+  selected,
+  onClick,
 }: {
-  ariaLabel: string;
-  placeholder: string;
-  options: string[];
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
+  label: string;
+  selected: boolean;
+  onClick: () => void;
 }) {
   return (
-    <div className="relative min-w-0 flex-1">
-      <select
-        aria-label={ariaLabel}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        className={cn(
-          "w-full appearance-none truncate rounded-xl border border-zinc-200 bg-white py-2 pl-3 pr-7 text-xs font-medium outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-200 disabled:bg-zinc-50 disabled:text-zinc-300",
-          value ? "text-zinc-800" : "text-zinc-400",
-        )}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option} value={option} className="text-zinc-800">
-            {option}
-          </option>
-        ))}
-      </select>
-      <ChevronDown
-        size={14}
-        className={cn(
-          "pointer-events-none absolute right-2 top-1/2 -translate-y-1/2",
-          disabled ? "text-zinc-300" : "text-zinc-400",
-        )}
-      />
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "shrink-0 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+        selected
+          ? "border-brand-300 bg-brand-100 text-brand-700"
+          : "border-brand-200 bg-brand-50 text-brand-700 hover:border-brand-300 hover:bg-brand-100",
+      )}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -276,10 +270,6 @@ function parseLocationParts(restaurant: Restaurant) {
     district: parts[1] ?? restaurant.area,
     town: parts.find((part, index) => index > 1 && /(동|읍|면|리)$/.test(part)) ?? "",
   };
-}
-
-function unique(values: string[]) {
-  return Array.from(new Set(values.filter(Boolean))).sort((left, right) => left.localeCompare(right, "ko"));
 }
 
 function regionMatches(actual: string, selected: string) {

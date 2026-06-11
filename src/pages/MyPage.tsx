@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, Clock3, LogOut, Trash2 } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { deleteCurrentUser, listTasteAgentSessions, type TasteAgentSession } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
@@ -59,19 +59,10 @@ export function MyPage() {
               {user?.display_name ?? "사용자"}님
             </div>
           </div>
-          <button
-            type="button"
-            onClick={logout}
-            aria-label="로그아웃"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-300 text-leaf-600 shadow-sm transition-colors hover:bg-brand-200"
-          >
-            <LogOut size={16} />
-          </button>
         </Card>
 
         <Card className="overflow-hidden">
           <header className="flex items-center gap-2 px-5 pb-2 pt-4">
-            <Clock3 size={15} className="text-leaf-600" />
             <h2 className="text-sm font-semibold text-zinc-900">최근 대화</h2>
           </header>
 
@@ -103,7 +94,7 @@ export function MyPage() {
           <button
             type="button"
             onClick={() => navigate("/history")}
-            className="flex w-full items-center justify-center gap-1 border-t border-zinc-100 px-5 py-3 text-xs font-medium text-leaf-600 transition-colors hover:bg-zinc-50"
+            className="flex w-full items-center justify-center gap-1 border-t border-brand-100 bg-brand-50 px-5 py-3 text-xs font-medium text-brand-700 transition-colors hover:bg-brand-100"
           >
             전체 보기
             <ChevronRight size={14} />
@@ -116,19 +107,22 @@ export function MyPage() {
           </div>
         )}
 
-        <Card className="p-4">
+        <div className="flex items-center justify-between px-1">
+          <button
+            type="button"
+            onClick={logout}
+            className="text-xs text-zinc-400 underline-offset-2 transition-colors hover:text-zinc-500 hover:underline"
+          >
+            로그아웃
+          </button>
           <button
             type="button"
             onClick={() => setConfirmDelete(true)}
-            className="flex w-full items-center justify-between gap-3 text-left"
+            className="text-xs text-zinc-400 underline-offset-2 transition-colors hover:text-zinc-500 hover:underline"
           >
-            <span>
-              <span className="block text-sm font-semibold text-rose-500">회원탈퇴</span>
-              <span className="mt-1 block text-xs text-zinc-400">저장 맛집과 대화 기록이 함께 삭제됩니다.</span>
-            </span>
-            <Trash2 size={17} className="shrink-0 text-rose-400" />
+            회원탈퇴
           </button>
-        </Card>
+        </div>
       </div>
 
       {confirmDelete && (
@@ -143,7 +137,7 @@ export function MyPage() {
                 type="button"
                 onClick={() => setConfirmDelete(false)}
                 disabled={deleting}
-                className="flex-1 rounded-xl bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-600 disabled:opacity-50"
+                className="flex-1 rounded-xl bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100 disabled:opacity-50"
               >
                 취소
               </button>
@@ -151,7 +145,7 @@ export function MyPage() {
                 type="button"
                 onClick={() => void handleDeleteAccount()}
                 disabled={deleting}
-                className="flex-1 rounded-xl bg-rose-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                className="flex-1 rounded-xl bg-brand-300 px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-200 disabled:opacity-50"
               >
                 {deleting ? "탈퇴 중..." : "탈퇴"}
               </button>

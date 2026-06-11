@@ -27,7 +27,7 @@ export function RestaurantMapPage() {
   const refresh = useCallback(async () => {
     if (!token) return;
     try {
-      const nextRestaurants = await listRestaurants(token);
+      const nextRestaurants = await listRestaurants(token, { limit: 100 });
       setRestaurants(nextRestaurants);
       setSelectedId((current) => {
         if (current && nextRestaurants.some((restaurant) => restaurant.id === current)) return current;
@@ -97,12 +97,12 @@ export function RestaurantMapPage() {
           aria-label="내 위치로 이동"
           title={locationStatus === "failed" ? "위치를 가져오지 못했어요. 다시 시도하려면 누르세요." : "내 위치로 이동"}
           className={cn(
-            "pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border bg-white shadow-md transition-colors",
+            "pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border bg-brand-50 shadow-md transition-colors",
             locationStatus === "ready"
-              ? "border-brand-300 text-leaf-600"
+              ? "border-brand-300 text-brand-700 hover:bg-brand-100"
               : locationStatus === "failed"
-                ? "border-rose-200 text-rose-500 hover:bg-rose-50"
-                : "border-zinc-200 text-zinc-500 hover:bg-zinc-50",
+                ? "border-brand-300 text-brand-700 hover:bg-brand-100"
+                : "border-brand-200 text-brand-700 hover:bg-brand-100",
           )}
         >
           {locationStatus === "loading" ? (
@@ -118,7 +118,7 @@ export function RestaurantMapPage() {
               type="button"
               onClick={() => setSelectedId(null)}
               aria-label="닫기"
-              className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/70 hover:text-zinc-600"
+              className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-50 text-brand-700 transition-colors hover:bg-brand-100"
             >
               <X size={15} />
             </button>
@@ -158,7 +158,7 @@ export function RestaurantMapPage() {
                       href={getKakaoDirectionUrl(selectedRestaurant) ?? selectedRestaurant.kakao_place_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl border border-brand-300 bg-white text-xs font-semibold text-brand-700"
+                      className="inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-xl border border-brand-300 bg-brand-50 text-xs font-semibold text-brand-700 hover:bg-brand-100"
                     >
                       <ExternalLink size={13} />
                       길찾기

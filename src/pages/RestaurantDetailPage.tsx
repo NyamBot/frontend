@@ -97,7 +97,7 @@ export function RestaurantDetailPage() {
                       setMenuOpen(false);
                       navigate(`/restaurants/${restaurant.id}/edit`, { state: { restaurant } });
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-50"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-brand-700 transition-colors hover:bg-brand-50"
                   >
                     <Pencil size={14} />
                     수정
@@ -109,7 +109,7 @@ export function RestaurantDetailPage() {
                       setMenuOpen(false);
                       setConfirmOpen(true);
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-rose-500 transition-colors hover:bg-rose-50"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-brand-700 transition-colors hover:bg-brand-50"
                   >
                     <Trash2 size={14} />
                     삭제
@@ -128,9 +128,6 @@ export function RestaurantDetailPage() {
                 {restaurant.area} · {restaurant.cuisine} · {restaurant.price_level}
               </p>
             </div>
-            <span className="shrink-0 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-leaf-600">
-              {restaurant.rating_level}
-            </span>
           </div>
 
           {restaurant.mood_tags.length > 0 && (
@@ -150,7 +147,7 @@ export function RestaurantDetailPage() {
                 href={restaurant.kakao_place_url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-zinc-200 px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50"
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-brand-300 bg-brand-50 px-2.5 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
               >
                 <MapPin size={13} />
                 식당 보기
@@ -193,7 +190,7 @@ export function RestaurantDetailPage() {
                 취소
               </Button>
               <Button
-                className="flex-1 bg-rose-500 text-white hover:bg-rose-600"
+                className="flex-1 bg-brand-300 text-brand-700 hover:bg-brand-200"
                 onClick={() => void handleDelete()}
                 disabled={deleting}
               >
