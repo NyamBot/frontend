@@ -16,19 +16,19 @@ export function LoginPage() {
       <div className="flex h-screen w-full max-w-[440px] flex-col items-center justify-center bg-white px-7 py-10 text-center sm:h-[calc(100vh-3rem)] sm:max-h-[920px] sm:rounded-[2rem] sm:border sm:border-zinc-200 sm:shadow-xl">
         <MiniMascot className="h-40 w-40" />
 
-        <div className="mt-5 text-xl font-bold text-zinc-900">
-          NyamBot <span className="text-brand-500">AI</span>
+        <div className="mt-5 text-xl font-bold">
+          <span className="text-brand-500">NyamBot</span>
         </div>
 
         <h1 className="mt-3 text-lg font-semibold leading-snug text-zinc-800">
-          내 입맛은 <em className="not-italic text-brand-500">내가 남긴 메모</em>가
+          오늘 어디 갈지 고민될 때,
           <br />
-          제일 잘 알아요.
+          <em className="not-italic text-brand-500">내 맛집 메모</em>가 답을 알아요.
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-zinc-500">
-          다녀온 식당과 기록을 쌓아두면
+          맛집을 기록해두면
           <br />
-          질문에 맞춰 근거 있는 맛집을 골라 드려요.
+          AI가 다음에 갈 곳을 추천해드려요.
         </p>
 
         <div className="mt-7 w-full space-y-3">
@@ -40,12 +40,10 @@ export function LoginPage() {
           <button
             type="button"
             onClick={login}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FEE500] py-3 text-sm font-bold text-[#191600] transition hover:brightness-95"
+            aria-label="카카오로 시작하기"
+            className="mx-auto flex items-center justify-center rounded-xl bg-[#FEE500] px-20 py-3.5 text-sm font-bold text-black transition hover:brightness-95"
           >
-            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-[#191600] text-xs text-[#FEE500]">
-              K
-            </span>
-            카카오로 시작하기
+            KAKAO
           </button>
         </div>
       </div>

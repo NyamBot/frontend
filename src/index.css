@@ -43,6 +43,29 @@ body {
     #fafaf7;
 }
 
+/* 병아리 마스코트 살짝 흔들리는 포인트 모션 */
+@keyframes nyam-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  30% {
+    transform: translateY(-1.5px) rotate(-4deg);
+  }
+  60% {
+    transform: translateY(-1.5px) rotate(4deg);
+  }
+}
+.nyam-bob {
+  transform-origin: 50% 80%;
+  animation: nyam-bob 2.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nyam-bob {
+    animation: none;
+  }
+}
+
 /* 채팅 스레드 등 스크롤 영역의 얇은 스크롤바 */
 .tf-scroll {
   scrollbar-width: thin;

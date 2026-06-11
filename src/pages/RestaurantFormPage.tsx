@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Search, X } from "lucide-react";
 import {
@@ -11,6 +11,7 @@ import {
 } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { Button, Field, TextArea, TextInput } from "../components/ui";
+import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
 import { cn, extractArea, extractCuisine } from "../lib/utils";
 
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
@@ -35,6 +36,8 @@ export function RestaurantFormPage() {
 
   const [name, setName] = useState("");
   const [area, setArea] = useState("");
+  const [regionCity, setRegionCity] = useState("");
+  const [regionDistrict, setRegionDistrict] = useState("");
   const [cuisine, setCuisine] = useState("");
   const [priceLevel, setPriceLevel] = useState(PRICE_OPTIONS[1]);
   const [moodTags, setMoodTags] = useState<string[]>([]);
@@ -74,12 +77,21 @@ export function RestaurantFormPage() {
   }, [editing, initialSelectedPlace]);
 
   function hydrateFromRestaurant(restaurant: Restaurant) {
+    const region = parseRegionParts(restaurant.road_address || restaurant.address || restaurant.area);
     setName(restaurant.name);
-    setArea(restaurant.area);
+    setRegionCity(region.city);
+    setRegionDistrict(region.district);
+    setArea(region.area || restaurant.area);
     setCuisine(restaurant.cuisine);
     setPriceLevel(restaurant.price_level);
     setMoodTags(restaurant.mood_tags);
-    setManualEntry(true);
+    if (restaurant.kakao_place_id) {
+      setSelectedPlace(restaurantToPlace(restaurant));
+      setManualEntry(false);
+    } else {
+      setSelectedPlace(null);
+      setManualEntry(true);
+    }
   }
 
   function selectPlace(place: KakaoPlace) {
@@ -91,8 +103,11 @@ export function RestaurantFormPage() {
   }
 
   function hydrateFromPlace(place: KakaoPlace) {
+    const region = parseRegionParts(place.road_address_name || place.address_name);
     setName(place.place_name);
-    setArea(extractArea(place.address_name || place.road_address_name));
+    setRegionCity(region.city);
+    setRegionDistrict(region.district);
+    setArea(region.area || extractArea(place.address_name || place.road_address_name));
     setCuisine(extractCuisine(place.category_name));
     setNote((current) =>
       current.trim()
@@ -108,6 +123,8 @@ export function RestaurantFormPage() {
     setKakaoQuery("");
     setName("");
     setArea("");
+    setRegionCity("");
+    setRegionDistrict("");
     setCuisine("");
   }
 
@@ -116,7 +133,15 @@ export function RestaurantFormPage() {
     setManualEntry(false);
     setName("");
     setArea("");
+    setRegionCity("");
+    setRegionDistrict("");
     setCuisine("");
+  }
+
+  function updateRegion(nextCity: string, nextDistrict = "") {
+    setRegionCity(nextCity);
+    setRegionDistrict(nextDistrict);
+    setArea(buildRegionArea(nextCity, nextDistrict));
   }
 
   function addMoodTag(rawValue = tagInput) {
@@ -151,21 +176,39 @@ export function RestaurantFormPage() {
     setError(null);
     try {
       if (editing && id) {
+        const placeChanged = Boolean(selectedPlace) && selectedPlace?.id !== (target?.kakao_place_id ?? "");
+        const placeFields =
+          placeChanged && selectedPlace
+            ? {
+                kakao_place_id: selectedPlace.id || null,
+                kakao_place_url: selectedPlace.place_url || null,
+                address: selectedPlace.address_name || null,
+                road_address: selectedPlace.road_address_name || null,
+                phone: selectedPlace.phone || null,
+                latitude: selectedPlace.y ? Number(selectedPlace.y) : null,
+                longitude: selectedPlace.x ? Number(selectedPlace.x) : null,
+              }
+            : {
+                kakao_place_id: target?.kakao_place_id ?? null,
+                kakao_place_url: target?.kakao_place_url ?? null,
+                address: target?.address ?? null,
+                road_address: target?.road_address ?? null,
+                phone: target?.phone ?? null,
+                latitude: target?.latitude ?? null,
+                longitude: target?.longitude ?? null,
+              };
         const updated = await updateRestaurant(
           id,
           {
             name,
             area,
+            city: regionCity || null,
+            district: regionDistrict || null,
+            town: null,
             cuisine,
             price_level: priceLevel,
             mood_tags: moodTags,
-            kakao_place_id: target?.kakao_place_id ?? null,
-            kakao_place_url: target?.kakao_place_url ?? null,
-            address: target?.address ?? null,
-            road_address: target?.road_address ?? null,
-            phone: target?.phone ?? null,
-            latitude: target?.latitude ?? null,
-            longitude: target?.longitude ?? null,
+            ...placeFields,
           },
           token,
         );
@@ -175,6 +218,9 @@ export function RestaurantFormPage() {
           {
             name,
             area,
+            city: regionCity || null,
+            district: regionDistrict || null,
+            town: null,
             cuisine,
             price_level: priceLevel,
             mood_tags: moodTags,
@@ -207,6 +253,7 @@ export function RestaurantFormPage() {
           <Button
             variant="ghost"
             size="icon"
+            className="text-zinc-500! hover:bg-zinc-100! hover:text-zinc-700!"
             onClick={() => navigate(editing && id ? `/restaurants/${id}` : "/restaurants")}
             aria-label="뒤로"
           >
@@ -214,7 +261,7 @@ export function RestaurantFormPage() {
           </Button>
           <div>
             <h2 className="text-sm font-semibold text-zinc-900">
-              {editing ? "맛집 수정" : "새 맛집 작성"}
+              {editing ? "맛집 수정" : "맛집 작성"}
             </h2>
             <p className="text-[11px] text-zinc-400">
               {editing
@@ -224,13 +271,11 @@ export function RestaurantFormPage() {
           </div>
         </div>
 
-        {!editing && (
-          <>
-            {selectedPlace ? (
-              <div className="rounded-2xl border border-brand-300 bg-brand-50 p-3">
+        {selectedPlace ? (
+              <div className="rounded-2xl border border-brand-300 bg-white p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <span className="text-[11px] font-semibold text-leaf-600">선택한 장소</span>
+                    <span className="text-[11px] font-semibold text-brand-600">선택한 장소</span>
                     <strong className="mt-1 block truncate text-sm text-zinc-900">
                       {selectedPlace.place_name}
                     </strong>
@@ -239,7 +284,12 @@ export function RestaurantFormPage() {
                       {selectedPlace.road_address_name || selectedPlace.address_name}
                     </small>
                   </div>
-                  <Button variant="secondary" size="sm" onClick={changePlace}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="border-zinc-300! bg-white! text-zinc-600! hover:bg-zinc-50!"
+                    onClick={changePlace}
+                  >
                     장소 변경
                   </Button>
                 </div>
@@ -248,15 +298,18 @@ export function RestaurantFormPage() {
               <ManualFields
                 name={name}
                 area={area}
+                regionCity={regionCity}
+                regionDistrict={regionDistrict}
                 cuisine={cuisine}
                 onNameChange={setName}
                 onAreaChange={setArea}
+                onRegionChange={updateRegion}
                 onCuisineChange={setCuisine}
                 onBack={changePlace}
                 showBack
               />
             ) : (
-              <div className="rounded-2xl border border-zinc-200 bg-zinc-50/50 p-3">
+              <div>
                 <div className="flex items-end gap-2">
                   <Field label="카카오 장소 검색" className="flex-1">
                     <TextInput
@@ -271,12 +324,20 @@ export function RestaurantFormPage() {
                       placeholder="예: 성수 파스타"
                     />
                   </Field>
-                  <Button variant="secondary" disabled={placeLoading} onClick={handleSearchKakao}>
+                  <Button
+                    disabled={placeLoading}
+                    onClick={handleSearchKakao}
+                    aria-label="검색"
+                  >
                     <Search size={15} />
-                    {placeLoading ? "검색 중" : "검색"}
                   </Button>
                 </div>
-                <Button className="mt-2 w-full" variant="ghost" size="sm" onClick={startManualEntry}>
+                <Button
+                  className="mt-2 px-0 text-zinc-500! hover:bg-transparent! hover:text-zinc-700! hover:underline"
+                  variant="ghost"
+                  size="sm"
+                  onClick={startManualEntry}
+                >
                   검색에 없으면 직접 입력
                 </Button>
                 {kakaoPlaces.length > 0 && (
@@ -286,7 +347,7 @@ export function RestaurantFormPage() {
                         key={place.id}
                         type="button"
                         onClick={() => selectPlace(place)}
-                        className="block w-full rounded-xl border border-zinc-200 bg-white p-2.5 text-left transition-colors hover:bg-zinc-50"
+                        className="block w-full rounded-xl border border-brand-200 bg-white p-2.5 text-left transition-colors hover:border-brand-300 hover:bg-brand-50"
                       >
                         <strong className="block text-sm text-zinc-900">{place.place_name}</strong>
                         <span className="text-[11px] text-zinc-500">{place.category_name}</span>
@@ -299,35 +360,19 @@ export function RestaurantFormPage() {
                 )}
               </div>
             )}
-          </>
-        )}
 
-        {editing && (
-          <ManualFields
-            name={name}
-            area={area}
-            cuisine={cuisine}
-            onNameChange={setName}
-            onAreaChange={setArea}
-            onCuisineChange={setCuisine}
-            onBack={() => undefined}
-          />
-        )}
-
-        {(selectedPlace || manualEntry || editing) && (
-          <Field label="가격대">
-            <ChipRow>
-              {PRICE_OPTIONS.map((option) => (
-                <ChoiceChip
-                  key={option}
-                  label={option}
-                  selected={priceLevel === option}
-                  onClick={() => setPriceLevel(option)}
-                />
-              ))}
-            </ChipRow>
-          </Field>
-        )}
+        <Field label="가격대">
+          <ChipRow>
+            {PRICE_OPTIONS.map((option) => (
+              <ChoiceChip
+                key={option}
+                label={option}
+                selected={priceLevel === option}
+                onClick={() => setPriceLevel(option)}
+              />
+            ))}
+          </ChipRow>
+        </Field>
 
         <Field label="분위기 태그">
           <div className="flex items-center gap-2">
@@ -342,7 +387,13 @@ export function RestaurantFormPage() {
               }}
               placeholder="예: #조용한"
             />
-            <Button variant="secondary" size="icon" onClick={() => addMoodTag()} aria-label="태그 추가">
+            <Button
+              variant="secondary"
+              size="icon"
+              className="border-zinc-300! bg-white! text-zinc-600! hover:bg-zinc-50!"
+              onClick={() => addMoodTag()}
+              aria-label="태그 추가"
+            >
               <Plus size={16} />
             </Button>
           </div>
@@ -353,7 +404,7 @@ export function RestaurantFormPage() {
                   key={tag}
                   type="button"
                   onClick={() => removeMoodTag(tag)}
-                  className="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-medium text-leaf-600"
+                  className="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
                 >
                   #{tag}
                   <X size={12} />
@@ -381,7 +432,7 @@ export function RestaurantFormPage() {
         )}
 
         <Button className="w-full" disabled={saving || !canSave} onClick={handleSave}>
-          {saving ? "저장 중..." : editing ? "저장" : "맛집 저장"}
+          {saving ? "저장 중..." : "저장"}
         </Button>
       </div>
     </div>
@@ -391,28 +442,45 @@ export function RestaurantFormPage() {
 function ManualFields({
   name,
   area,
+  regionCity,
+  regionDistrict,
   cuisine,
   onNameChange,
   onAreaChange,
+  onRegionChange,
   onCuisineChange,
   onBack,
   showBack = false,
 }: {
   name: string;
   area: string;
+  regionCity: string;
+  regionDistrict: string;
   cuisine: string;
   onNameChange: (value: string) => void;
   onAreaChange: (value: string) => void;
+  onRegionChange: (city: string, district?: string) => void;
   onCuisineChange: (value: string) => void;
   onBack: () => void;
   showBack?: boolean;
 }) {
+  const districtOptions = useMemo(
+    () => (regionCity ? DISTRICT_OPTIONS_BY_CITY[regionCity] ?? [] : []),
+    [regionCity],
+  );
+
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-3">
+    <div className="rounded-2xl border border-brand-100 bg-brand-50 p-3">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-semibold text-zinc-600">직접 입력</span>
         {showBack && (
-          <Button variant="ghost" size="icon" onClick={onBack} aria-label="카카오 검색으로 돌아가기">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-zinc-500! hover:bg-zinc-100! hover:text-zinc-700!"
+            onClick={onBack}
+            aria-label="카카오 검색으로 돌아가기"
+          >
             <ArrowLeft size={16} />
           </Button>
         )}
@@ -421,16 +489,66 @@ function ManualFields({
         <Field label="식당명">
           <TextInput value={name} onChange={(event) => onNameChange(event.target.value)} />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="지역">
-            <TextInput value={area} onChange={(event) => onAreaChange(event.target.value)} />
-          </Field>
-          <Field label="음식 종류">
-            <TextInput value={cuisine} onChange={(event) => onCuisineChange(event.target.value)} />
-          </Field>
-        </div>
+        <Field label="지역 선택">
+          <div className="grid grid-cols-2 gap-2">
+            <RegionSelect
+              ariaLabel="시 선택"
+              placeholder="시"
+              options={CITY_OPTIONS}
+              value={regionCity}
+              onChange={(value) => onRegionChange(value)}
+            />
+            <RegionSelect
+              ariaLabel="군·구 선택"
+              placeholder="군·구"
+              options={districtOptions}
+              value={regionDistrict}
+              disabled={!regionCity || districtOptions.length === 0}
+              onChange={(value) => onRegionChange(regionCity, value)}
+            />
+          </div>
+        </Field>
+        <Field label="음식 종류">
+          <TextInput value={cuisine} onChange={(event) => onCuisineChange(event.target.value)} />
+        </Field>
       </div>
     </div>
+  );
+}
+
+function RegionSelect({
+  ariaLabel,
+  placeholder,
+  options,
+  value,
+  onChange,
+  disabled,
+}: {
+  ariaLabel: string;
+  placeholder: string;
+  options: string[];
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <select
+      aria-label={ariaLabel}
+      value={value}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value)}
+      className={cn(
+        "min-w-0 rounded-xl border border-zinc-200 bg-white px-2 py-2 text-xs font-medium outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-200 disabled:bg-zinc-50 disabled:text-zinc-300",
+        value ? "text-zinc-800" : "text-zinc-400",
+      )}
+    >
+      <option value="">{placeholder}</option>
+      {options.map((option) => (
+        <option key={option} value={option} className="text-zinc-800">
+          {option}
+        </option>
+      ))}
+    </select>
   );
 }
 
@@ -454,11 +572,64 @@ function ChoiceChip({
       className={cn(
         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         selected
-          ? "border-brand-300 bg-brand-50 text-leaf-600"
+          ? "border-brand-300 bg-brand-100 text-brand-700"
           : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
       )}
     >
       {label}
     </button>
   );
+}
+
+function restaurantToPlace(restaurant: Restaurant): KakaoPlace {
+  return {
+    id: restaurant.kakao_place_id ?? "",
+    place_name: restaurant.name,
+    category_name: restaurant.cuisine,
+    address_name: restaurant.address ?? restaurant.area,
+    road_address_name: restaurant.road_address ?? "",
+    phone: restaurant.phone ?? "",
+    place_url: restaurant.kakao_place_url ?? "",
+    x: restaurant.longitude != null ? String(restaurant.longitude) : "",
+    y: restaurant.latitude != null ? String(restaurant.latitude) : "",
+  };
+}
+
+function parseRegionParts(source: string) {
+  const parts = source.split(" ").filter(Boolean);
+  const city = normalizeCity(parts[0] ?? "");
+  const district = parts[1] ?? "";
+  return {
+    city,
+    district,
+    area: buildRegionArea(city, district),
+  };
+}
+
+
+function normalizeCity(value: string) {
+  const aliases: Record<string, string> = {
+    강원: "강원특별자치도",
+    경기: "경기도",
+    경남: "경상남도",
+    경북: "경상북도",
+    광주: "광주광역시",
+    대구: "대구광역시",
+    대전: "대전광역시",
+    부산: "부산광역시",
+    서울: "서울특별시",
+    세종: "세종특별자치시",
+    울산: "울산광역시",
+    인천: "인천광역시",
+    전남: "전라남도",
+    전북: "전북특별자치도",
+    제주: "제주특별자치도",
+    충남: "충청남도",
+    충북: "충청북도",
+  };
+  return aliases[value] ?? value;
+}
+
+function buildRegionArea(city: string, district = "") {
+  return [city, district].filter(Boolean).join(" ");
 }

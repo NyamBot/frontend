@@ -21,8 +21,8 @@ export function Button({
     "inline-flex items-center justify-center gap-1.5 rounded-xl font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400";
   const variants = {
     primary: "bg-brand-300 text-leaf-600 hover:bg-brand-200 shadow-sm",
-    secondary: "border border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50",
-    ghost: "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800",
+    secondary: "border border-brand-300 bg-brand-50 text-brand-700 hover:bg-brand-100",
+    ghost: "text-brand-700 hover:bg-brand-50 hover:text-brand-700",
   };
   const sizes = {
     sm: "h-8 px-3 text-xs",
@@ -72,7 +72,7 @@ export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
 
 export function Tag({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-full bg-leaf-50 px-2 py-0.5 text-[11px] font-medium text-leaf-500">
+    <span className="inline-flex items-center rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-600">
       {children}
     </span>
   );

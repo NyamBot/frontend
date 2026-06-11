@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Compass, Crosshair, RefreshCw, Send, SlidersHorizontal, Sparkles, SquarePen } from "lucide-react";
+import { useLocation as useRouteLocation } from "react-router-dom";
+import { AlertTriangle, MapPin, MapPinOff, RefreshCw, Send, SlidersHorizontal, Square, SquarePen } from "lucide-react";
 import {
   chatTasteAgent,
   type RestaurantRecommendation,
   type TasteAgentMessage,
+  type TasteAgentSession,
 } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
+import { RecommendationMessage } from "../components/RecommendationCards";
 import { Button, TextInput } from "../components/ui";
 import { cn } from "../lib/utils";
 
@@ -21,6 +24,7 @@ const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", 
 
 export function ChatPage() {
   const { token } = useAuth();
+  const location = useRouteLocation();
   const [messages, setMessages] = useState<TasteAgentMessage[]>([]);
   const [recommendations, setRecommendations] = useState<RestaurantRecommendation[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -35,16 +39,38 @@ export function ChatPage() {
   const [error, setError] = useState<string | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
-  const locationEnabledRef = useRef(useLocation);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, recommendations, loading]);
 
   useEffect(() => {
-    if (useLocation) requestCurrentLocation();
-    locationEnabledRef.current = useLocation;
-  }, [useLocation]);
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    requestCurrentLocation();
+  }, []);
+
+  useEffect(() => {
+    const routeSession = (location.state as { session?: TasteAgentSession } | null)?.session ?? null;
+    if (routeSession) {
+      activateSession(routeSession);
+      return;
+    }
+    clearChat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, location.state]);
+
+  function activateSession(session: TasteAgentSession) {
+    setSessionId(session.id);
+    setMessages(session.messages);
+    setRecommendations(getLatestAssistantRecommendations(session.messages));
+    setError(null);
+  }
 
   function requestCurrentLocation() {
     if (!window.isSecureContext || !navigator.geolocation) {
@@ -55,7 +81,6 @@ export function ChatPage() {
     setLocationStatus("loading");
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        if (!locationEnabledRef.current) return;
         setCurrentLocation({
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
@@ -63,7 +88,6 @@ export function ChatPage() {
         setLocationStatus("ready");
       },
       () => {
-        if (!locationEnabledRef.current) return;
         setCurrentLocation(null);
         setLocationStatus("failed");
       },
@@ -72,15 +96,24 @@ export function ChatPage() {
   }
 
   function clearChat() {
+    stopResponse();
     setSessionId(null);
     setMessages([]);
     setRecommendations([]);
     setError(null);
   }
 
-  async function handleAsk() {
-    if (!token || !query.trim() || loading) return;
-    const asked = query.trim();
+  function stopResponse() {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setLoading(false);
+  }
+
+  async function handleAsk(rawQuery: string = query) {
+    if (!token || !rawQuery.trim() || loading) return;
+    const asked = rawQuery.trim();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
     setQuery("");
     setLoading(true);
     setError(null);
@@ -121,7 +154,9 @@ export function ChatPage() {
           limit: 3,
         },
         token,
+        abortController.signal,
       );
+      abortControllerRef.current = null;
       setSessionId(response.session_id);
       setMessages((prev) => [
         ...prev,
@@ -135,117 +170,115 @@ export function ChatPage() {
           metadata: {
             recommendation_count: response.recommendations.length,
             restaurant_names: response.recommendations.map((recommendation) => recommendation.restaurant.name),
+            recommendations: response.recommendations,
           },
           created_at: new Date().toISOString(),
         },
       ]);
       setRecommendations(response.recommendations);
     } catch (caught) {
+      if (caught instanceof DOMException && caught.name === "AbortError") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `local-stopped-${prev.length}`,
+            session_id: sessionId,
+            user_id: null,
+            role: "assistant",
+            content: "응답 생성을 중지했어요.",
+            retrieved_context: [],
+            metadata: {},
+            created_at: new Date().toISOString(),
+          },
+        ]);
+        return;
+      }
       setError(caught instanceof Error ? caught.message : "맛집 추천에 실패했습니다.");
     } finally {
+      abortControllerRef.current = null;
       setLoading(false);
     }
   }
 
   const hasThread = messages.length > 0;
-  const lastMessage = messages[messages.length - 1];
-  const displayedMessages =
-    recommendations.length > 0 && lastMessage?.role === "assistant" ? messages.slice(0, -1) : messages;
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-4 pt-3">
-        <button
-          type="button"
-          onClick={() => setShowFilters((value) => !value)}
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-            showFilters
-              ? "border-brand-300 bg-brand-50 text-leaf-600"
-              : "border-zinc-200 text-zinc-500 hover:bg-zinc-50",
-          )}
-        >
-          <SlidersHorizontal size={13} />
-          검색 조건
-        </button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={clearChat}
-          disabled={!hasThread && recommendations.length === 0}
-          aria-label="새 대화"
-        >
-          <SquarePen size={14} />
-          새 대화
-        </Button>
-      </div>
-
-      <div className="mx-4 mt-2 flex items-center gap-3 rounded-2xl border border-zinc-200 bg-white px-3 py-2">
-        <span
-          className={cn(
-            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
-            useLocation && locationStatus === "ready" ? "bg-brand-50 text-leaf-600" : "bg-zinc-50 text-zinc-400",
-          )}
-        >
-          {locationStatus === "loading" ? <RefreshCw size={14} className="animate-spin" /> : <Crosshair size={14} />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-xs font-semibold text-zinc-700">위치 반영</div>
-          <div className="truncate text-[11px] text-zinc-400">
-            {!useLocation
-              ? "저장 기록만 보고 추천해요."
-              : locationStatus === "ready"
-                ? "현재 위치를 추천에 반영해요."
-                : locationStatus === "loading"
-                  ? "위치를 빠르게 확인하는 중이에요."
-                  : "위치 없이도 추천할 수 있어요."}
-          </div>
-        </div>
-        {useLocation && locationStatus === "failed" && (
+      <div className="flex items-center justify-between gap-2 px-4 pt-3">
+        <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
-            onClick={requestCurrentLocation}
-            className="inline-flex h-8 shrink-0 items-center rounded-xl bg-zinc-50 px-2.5 text-xs font-medium text-zinc-500 hover:bg-zinc-100"
+            onClick={() => setShowFilters((value) => !value)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+              showFilters
+                ? "border-brand-300 bg-brand-100 text-brand-700"
+                : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100",
+            )}
           >
-            재시도
+            <SlidersHorizontal size={13} />
+            검색 조건
           </button>
-        )}
-        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             role="switch"
             aria-checked={useLocation}
             aria-label="위치 반영"
             onClick={() => {
+              if (useLocation && locationStatus === "failed") {
+                requestCurrentLocation();
+                return;
+              }
               const next = !useLocation;
-              locationEnabledRef.current = next;
               setUseLocation(next);
-              if (!next) {
+              if (next) {
+                requestCurrentLocation();
+              } else {
                 setCurrentLocation(null);
                 setLocationStatus("idle");
               }
             }}
             className={cn(
-              "relative h-7 w-12 rounded-full transition-colors",
-              useLocation ? "bg-leaf-500" : "bg-zinc-200",
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-colors",
+              !useLocation
+                ? "bg-brand-50 text-brand-700 hover:bg-brand-100"
+                : locationStatus === "ready"
+                  ? "bg-brand-100 text-brand-700 hover:bg-brand-200"
+                  : locationStatus === "failed"
+                    ? "bg-amber-50 text-amber-600 hover:bg-amber-100"
+                    : "bg-brand-50 text-brand-700 hover:bg-brand-100",
             )}
           >
-            <span
-              className={cn(
-                "absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
-                useLocation ? "translate-x-5" : "translate-x-0",
-              )}
-            />
+            {!useLocation ? (
+              <MapPinOff size={12} />
+            ) : locationStatus === "loading" ? (
+              <RefreshCw size={11} className="animate-spin" />
+            ) : locationStatus === "failed" ? (
+              <AlertTriangle size={12} />
+            ) : (
+              <MapPin size={12} />
+            )}
+            {!useLocation
+              ? "위치 꺼짐"
+              : locationStatus === "ready"
+                ? "위치 반영중"
+                : locationStatus === "loading"
+                  ? "위치 확인중"
+                  : locationStatus === "failed"
+                    ? "위치 안 잡힘"
+                    : "위치 대기중"}
           </button>
-          <span
-            className={cn(
-              "w-7 text-right text-[11px] font-bold",
-              useLocation ? "text-leaf-600" : "text-zinc-400",
-            )}
-          >
-            {useLocation ? "ON" : "OFF"}
-          </span>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={clearChat}
+          disabled={!hasThread}
+          aria-label="새 대화"
+        >
+          <SquarePen size={14} />
+          새 대화
+        </Button>
       </div>
 
       {showFilters && (
@@ -280,11 +313,15 @@ export function ChatPage() {
       )}
 
       <div ref={threadRef} className="tf-scroll flex-1 space-y-5 overflow-y-auto px-4 py-5">
-        {displayedMessages.map((message) => (
-          <Bubble key={message.id} role={message.role}>
-            {message.content}
-          </Bubble>
-        ))}
+        {messages.map((message) =>
+          message.role === "assistant" && message.metadata.recommendations?.length ? (
+            <RecommendationMessage key={message.id} recommendations={message.metadata.recommendations} />
+          ) : (
+            <Bubble key={message.id} role={message.role}>
+              {message.content}
+            </Bubble>
+          ),
+        )}
 
         {loading && (
           <Bubble role="assistant" muted>
@@ -292,26 +329,21 @@ export function ChatPage() {
           </Bubble>
         )}
 
-        {recommendations.length > 0 && (
-          <RecommendationMessage recommendations={recommendations} />
-        )}
-
         {!hasThread && !loading && (
           <div className="flex flex-col items-center gap-2 py-10 text-center">
             <MiniMascot className="h-14 w-14" />
-            <strong className="text-sm font-semibold text-zinc-700">아직 추천 결과가 없어요.</strong>
+            <strong className="text-sm font-semibold text-zinc-700">오늘은 어디서 먹을까요?</strong>
             <span className="text-xs text-zinc-400">
-              아래 입력창에서 질문하면 답변과 추천 카드가 나타나요.
+              먹고 싶은 메뉴나 분위기를 말해주면 딱 맞는 맛집을 찾아드릴게요.
             </span>
             <div className="mt-2 flex flex-wrap justify-center gap-2">
               {QUICK_QUERIES.map((quickQuery) => (
                 <button
                   key={quickQuery}
                   type="button"
-                  onClick={() => setQuery(quickQuery)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 hover:border-brand-300 hover:bg-brand-50"
+                  onClick={() => void handleAsk(quickQuery)}
+                  className="inline-flex items-center rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs text-brand-700 hover:border-brand-300 hover:bg-brand-100"
                 >
-                  <Sparkles size={12} />
                   {quickQuery}
                 </button>
               ))}
@@ -347,8 +379,14 @@ export function ChatPage() {
             placeholder="예: 성수에서 조용한 데이트 맛집 골라줘"
             className="max-h-32 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-zinc-800 placeholder:text-zinc-400 outline-none"
           />
-          <Button type="submit" size="icon" disabled={loading || !query.trim()} aria-label="전송">
-            {loading ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+          <Button
+            type={loading ? "button" : "submit"}
+            size="icon"
+            disabled={!loading && !query.trim()}
+            aria-label={loading ? "응답 중지" : "전송"}
+            onClick={loading ? stopResponse : undefined}
+          >
+            {loading ? <Square size={16} /> : <Send size={16} />}
           </Button>
         </form>
       </div>
@@ -385,8 +423,8 @@ function ChoiceChip({
       className={cn(
         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         selected
-          ? "border-brand-300 bg-brand-50 text-leaf-600"
-          : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
+          ? "border-brand-300 bg-brand-100 text-brand-700"
+          : "border-brand-200 bg-brand-50 text-brand-700 hover:border-brand-300 hover:bg-brand-100",
       )}
     >
       {label}
@@ -409,7 +447,7 @@ function Bubble({
       <div className={cn("flex max-w-[88%] gap-2.5", isUser && "flex-row-reverse")}>
         {!isUser && (
           <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-            <MiniMascot className="h-8 w-8" />
+            <MiniMascot className="h-8 w-8 nyam-bob" />
           </div>
         )}
         <div className={cn("min-w-0 space-y-1", isUser && "text-right")}>
@@ -459,86 +497,12 @@ function TypingIndicator() {
   );
 }
 
-function RecommendationMessage({ recommendations }: { recommendations: RestaurantRecommendation[] }) {
-  return (
-    <div className="flex w-full">
-      <div className="flex max-w-[88%] gap-2.5">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center">
-          <MiniMascot className="h-8 w-8" />
-        </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          <span className="text-[11px] font-medium text-zinc-400">NyamBot</span>
-          <div className="space-y-4 rounded-2xl bg-zinc-100 px-3.5 py-3">
-            {recommendations.map((recommendation, index) => (
-              <RecommendationCard key={recommendation.restaurant.id} rec={recommendation} rank={index + 1} />
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function RecommendationCard({ rec, rank }: { rec: RestaurantRecommendation; rank: number }) {
-  const restaurant = rec.restaurant;
-  const description = buildRecommendationDescription(rec);
-  const metaParts = [restaurant.area, restaurant.cuisine, restaurant.price_level].filter(Boolean);
-
-  return (
-    <div className="space-y-2">
-      <article className="rounded-2xl border border-zinc-200 bg-white p-3.5 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <strong className="block truncate text-sm font-semibold text-zinc-900">{restaurant.name}</strong>
-            <span className="text-xs text-zinc-500">
-              {metaParts.join(" · ")}
-            </span>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-leaf-600">
-            <Sparkles size={11} />
-            {rank}순위
-          </span>
-        </div>
-      </article>
-
-      <p className="rounded-2xl bg-white px-3.5 py-2.5 text-sm leading-relaxed text-zinc-800">
-        {description}
-      </p>
-
-      {restaurant.kakao_place_url && (
-        <div className="flex justify-end">
-          <a
-            href={restaurant.kakao_place_url}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-medium text-leaf-500 hover:text-leaf-600"
-          >
-            <Compass size={12} />
-            카카오맵으로 바로가기
-          </a>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function buildRecommendationDescription(rec: RestaurantRecommendation) {
-  const evidence = rec.evidence[0]?.trim();
-  const caution = rec.caution?.trim();
-  const isExternalCandidate = rec.restaurant.id.startsWith("kakao-") || rec.restaurant.note_count === 0;
-  const parts = [];
-
-  if (evidence) {
-    const cleanEvidence = evidence.replace(/[.!?。！？]+$/, "");
-    parts.push(isExternalCandidate ? cleanEvidence : `${cleanEvidence}라는 기록이 있어.`);
-  } else {
-    parts.push(rec.reason.replace(/[.!?。！？]+$/, ""));
+function getLatestAssistantRecommendations(messages: TasteAgentMessage[]) {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role === "assistant" && message.metadata.recommendations?.length) {
+      return message.metadata.recommendations;
+    }
   }
-
-  if (caution && !isExternalCandidate) {
-    parts.push(caution.replace(/[.!?。！？]+$/, ""));
-  }
-
-  return parts.join(" ");
+  return [];
 }
-
