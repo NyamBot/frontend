@@ -1,5 +1,6 @@
 import { Compass } from "lucide-react";
 import type { RestaurantRecommendation } from "../api";
+import { shortRegionLabel } from "../data/koreaRegions";
 import { cn } from "../lib/utils";
 import { MiniMascot } from "./Mascot";
 
@@ -34,7 +35,7 @@ export function RecommendationMessage({
 function RecommendationCard({ rec, rank }: { rec: RestaurantRecommendation; rank: number }) {
   const restaurant = rec.restaurant;
   const description = buildRecommendationDescription(rec);
-  const metaParts = [restaurant.area, restaurant.cuisine, restaurant.price_level].filter(Boolean);
+  const metaParts = [shortRegionLabel(restaurant.area), restaurant.cuisine, restaurant.price_level].filter(Boolean);
 
   return (
     <div className="space-y-2">

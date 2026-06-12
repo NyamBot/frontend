@@ -156,9 +156,6 @@ export function HistoryDetailPage() {
         <div className="fixed inset-0 z-50 flex items-end bg-zinc-950/25 px-4 pb-4 sm:items-center sm:justify-center sm:p-4">
           <section className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl">
             <h2 className="text-sm font-semibold text-zinc-900">대화 기록을 삭제할까요?</h2>
-            <p className="mt-2 text-sm leading-relaxed text-zinc-500">
-              목록에서는 사라지지만 실제 대화 로그는 보관됩니다.
-            </p>
             <div className="mt-4 flex gap-2">
               <Button
                 className="flex-1"

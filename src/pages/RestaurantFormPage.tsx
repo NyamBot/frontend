@@ -11,34 +11,11 @@ import {
 } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { Button, Field, TextArea, TextInput } from "../components/ui";
-import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
+import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY, shortCityLabel } from "../data/koreaRegions";
 import { cn, extractArea, extractCuisine } from "../lib/utils";
 
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
-
-const CITY_SHORT_LABELS: Record<string, string> = {
-  강원특별자치도: "강원",
-  경기도: "경기",
-  경상남도: "경남",
-  경상북도: "경북",
-  광주광역시: "광주",
-  대구광역시: "대구",
-  대전광역시: "대전",
-  부산광역시: "부산",
-  서울특별시: "서울",
-  세종특별자치시: "세종",
-  울산광역시: "울산",
-  인천광역시: "인천",
-  전라남도: "전남",
-  전북특별자치도: "전북",
-  제주특별자치도: "제주",
-  충청남도: "충남",
-  충청북도: "충북",
-};
-
-function shortCityLabel(value: string) {
-  return CITY_SHORT_LABELS[value] ?? value;
-}
+const CUISINE_OPTIONS = ["한식", "일식", "중식", "양식", "분식", "카페", "술집", "기타"];
 
 export function RestaurantFormPage() {
   const { token } = useAuth();
@@ -132,7 +109,7 @@ export function RestaurantFormPage() {
     setRegionCity(region.city);
     setRegionDistrict(region.district);
     setArea(region.area || extractArea(place.address_name || place.road_address_name));
-    setCuisine(extractCuisine(place.category_name));
+    setCuisine(normalizeCuisine(place.category_name));
     setNote((current) =>
       current.trim()
         ? current
@@ -268,7 +245,9 @@ export function RestaurantFormPage() {
     }
   }
 
-  const canSave = editing ? name.trim() && area.trim() && cuisine.trim() : name.trim() && note.trim();
+  const canSave = editing
+    ? name.trim() && area.trim() && cuisine.trim()
+    : name.trim() && area.trim() && cuisine.trim() && note.trim();
 
   return (
     <div className="tf-scroll h-full overflow-y-auto">
@@ -321,14 +300,10 @@ export function RestaurantFormPage() {
             ) : manualEntry ? (
               <ManualFields
                 name={name}
-                area={area}
                 regionCity={regionCity}
                 regionDistrict={regionDistrict}
-                cuisine={cuisine}
                 onNameChange={setName}
-                onAreaChange={setArea}
                 onRegionChange={updateRegion}
-                onCuisineChange={setCuisine}
                 onBack={changePlace}
                 showBack
               />
@@ -384,6 +359,19 @@ export function RestaurantFormPage() {
                 )}
               </div>
             )}
+
+        <Field label="음식 종류">
+          <ChipRow>
+            {CUISINE_OPTIONS.map((option) => (
+              <ChoiceChip
+                key={option}
+                label={option}
+                selected={cuisine === option}
+                onClick={() => setCuisine(option)}
+              />
+            ))}
+          </ChipRow>
+        </Field>
 
         <Field label="가격대">
           <ChipRow>
@@ -465,26 +453,18 @@ export function RestaurantFormPage() {
 
 function ManualFields({
   name,
-  area,
   regionCity,
   regionDistrict,
-  cuisine,
   onNameChange,
-  onAreaChange,
   onRegionChange,
-  onCuisineChange,
   onBack,
   showBack = false,
 }: {
   name: string;
-  area: string;
   regionCity: string;
   regionDistrict: string;
-  cuisine: string;
   onNameChange: (value: string) => void;
-  onAreaChange: (value: string) => void;
   onRegionChange: (city: string, district?: string) => void;
-  onCuisineChange: (value: string) => void;
   onBack: () => void;
   showBack?: boolean;
 }) {
@@ -515,7 +495,7 @@ function ManualFields({
         </Field>
         <div className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-3">
           <section className="space-y-2">
-            <h3 className="text-xs font-bold text-zinc-500">지역 — 시·도</h3>
+            <h3 className="text-xs font-bold text-zinc-500">지역</h3>
             <ChipRow>
               {CITY_OPTIONS.map((city) => (
                 <ChoiceChip
@@ -547,9 +527,6 @@ function ManualFields({
             </section>
           )}
         </div>
-        <Field label="음식 종류">
-          <TextInput value={cuisine} onChange={(event) => onCuisineChange(event.target.value)} />
-        </Field>
       </div>
     </div>
   );
@@ -613,6 +590,16 @@ function parseRegionParts(source: string) {
   };
 }
 
+function normalizeCuisine(category: string) {
+  const normalized = category.replace(/\s+/g, "");
+  if (/카페|커피|디저트|베이커리/.test(normalized)) return "카페";
+  if (/술집|주점|호프|바$|이자카야/.test(normalized)) return "술집";
+  const matched = CUISINE_OPTIONS.find((option) => option !== "기타" && normalized.includes(option));
+  if (matched) return matched;
+  const extracted = extractCuisine(category);
+  return CUISINE_OPTIONS.includes(extracted) ? extracted : "기타";
+}
+
 
 function normalizeCity(value: string) {
   const aliases: Record<string, string> = {
@@ -638,5 +625,5 @@ function normalizeCity(value: string) {
 }
 
 function buildRegionArea(city: string, district = "") {
-  return [city, district].filter(Boolean).join(" ");
+  return [city ? shortCityLabel(city) : "", district].filter(Boolean).join(" ");
 }

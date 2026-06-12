@@ -64,10 +64,9 @@ export function HistoryPage() {
                 className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-brand-50"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="line-clamp-1 text-sm font-medium text-zinc-900">
+                  <span className="line-clamp-1 w-full text-sm font-medium leading-snug text-zinc-900">
                     {getSessionTitle(session)}
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-zinc-400">{formatDate(session.updated_at)}</div>
+                  </span>
                 </div>
                 <ChevronRight size={16} className="shrink-0 text-zinc-300" />
               </button>
@@ -107,13 +106,4 @@ function getSessionTitle(session: TasteAgentSession) {
   if (title) return title;
   const firstQuestion = session.messages.find((message) => message.role === "user")?.content;
   return firstQuestion ?? "새 대화";
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "long",
-    day: "numeric",
-  }).format(date);
 }

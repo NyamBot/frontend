@@ -68,8 +68,8 @@ export type TasteAgentMessage = {
   retrieved_context: string[];
   metadata: {
     area?: string | null;
-    cuisine?: string | null;
-    price_level?: string | null;
+    cuisine?: string | string[] | null;
+    price_level?: string | string[] | null;
     tags?: string[];
     limit?: number;
     request_id?: string | null;
@@ -185,18 +185,22 @@ export async function createRestaurant(payload: {
 export async function listRestaurants(
   token: string,
   filters: {
-    city?: string;
-    district?: string;
-    town?: string;
+    city?: string | string[];
+    district?: string | string[];
+    town?: string | string[];
+    cuisine?: string | string[];
+    price_level?: string | string[];
     query?: string;
     limit?: number;
     offset?: number;
   } = {},
 ) {
   const params = new URLSearchParams();
-  if (filters.city) params.set("city", filters.city);
-  if (filters.district) params.set("district", filters.district);
-  if (filters.town) params.set("town", filters.town);
+  appendFilterParams(params, "city", filters.city);
+  appendFilterParams(params, "district", filters.district);
+  appendFilterParams(params, "town", filters.town);
+  appendFilterParams(params, "cuisine", filters.cuisine);
+  appendFilterParams(params, "price_level", filters.price_level);
   if (filters.query) params.set("query", filters.query);
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.offset) params.set("offset", String(filters.offset));
@@ -206,6 +210,12 @@ export async function listRestaurants(
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to list restaurants"));
   return response.json() as Promise<Restaurant[]>;
+}
+
+function appendFilterParams(params: URLSearchParams, key: string, value?: string | string[]) {
+  if (!value) return;
+  const values = Array.isArray(value) ? value : [value];
+  values.filter(Boolean).forEach((item) => params.append(key, item));
 }
 
 export async function getRestaurant(restaurantId: string, token: string) {
@@ -285,8 +295,6 @@ export async function chatTasteAgent(payload: {
   query: string;
   message: string;
   area?: string | null;
-  cuisine?: string | null;
-  price_level?: string | null;
   tags: string[];
   latitude?: number | null;
   longitude?: number | null;

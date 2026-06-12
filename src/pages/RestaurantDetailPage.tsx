@@ -5,6 +5,7 @@ import { deleteRestaurant, getRestaurant, type Restaurant } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { KakaoMap } from "../components/KakaoMap";
 import { Button, Card, Tag } from "../components/ui";
+import { shortRegionLabel } from "../data/koreaRegions";
 
 export function RestaurantDetailPage() {
   const { token } = useAuth();
@@ -125,7 +126,7 @@ export function RestaurantDetailPage() {
             <div className="min-w-0">
               <h2 className="truncate text-lg font-bold text-zinc-900">{restaurant.name}</h2>
               <p className="mt-1 text-sm text-zinc-500">
-                {restaurant.area} · {restaurant.cuisine} · {restaurant.price_level}
+                {shortRegionLabel(restaurant.area)} · {restaurant.cuisine} · {restaurant.price_level}
               </p>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation as useRouteLocation } from "react-router-dom";
-import { AlertTriangle, MapPin, MapPinOff, RefreshCw, Send, SlidersHorizontal, Square, SquarePen } from "lucide-react";
+import { AlertTriangle, MapPin, MapPinOff, RefreshCw, Send, Square, SquarePen } from "lucide-react";
 import {
   cancelTasteAgentChat,
   chatTasteAgent,
@@ -20,9 +20,6 @@ const QUICK_QUERIES = [
   "회식으로 무난한 맛집 골라줘",
 ];
 
-const CUISINE_OPTIONS = ["한식", "일식", "중식", "양식", "분식", "카페", "술집"];
-const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
-
 export function ChatPage() {
   const { token } = useAuth();
   const location = useRouteLocation();
@@ -30,12 +27,9 @@ export function ChatPage() {
   const [recommendations, setRecommendations] = useState<RestaurantRecommendation[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [cuisine, setCuisine] = useState("");
-  const [priceLevel, setPriceLevel] = useState("");
   const [useLocation, setUseLocation] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "ready" | "failed">("idle");
-  const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,8 +147,6 @@ export function ChatPage() {
         content: asked,
         retrieved_context: [],
         metadata: {
-          cuisine: cuisine || null,
-          price_level: priceLevel || null,
           tags: [],
           latitude: useLocation ? currentLocation?.latitude ?? null : null,
           longitude: useLocation ? currentLocation?.longitude ?? null : null,
@@ -171,8 +163,6 @@ export function ChatPage() {
           message: asked,
           session_id: sessionId,
           request_id: requestId,
-          cuisine: cuisine || null,
-          price_level: priceLevel || null,
           tags: [],
           latitude: useLocation ? currentLocation?.latitude ?? null : null,
           longitude: useLocation ? currentLocation?.longitude ?? null : null,
@@ -257,19 +247,6 @@ export function ChatPage() {
         <div className="flex min-w-0 items-center gap-2">
           <button
             type="button"
-            onClick={() => setShowFilters((value) => !value)}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-              showFilters
-                ? "border-brand-300 bg-brand-100 text-brand-700"
-                : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100",
-            )}
-          >
-            <SlidersHorizontal size={13} />
-            검색 조건
-          </button>
-          <button
-            type="button"
             role="switch"
             aria-checked={useLocation}
             aria-label="위치 반영"
@@ -329,37 +306,6 @@ export function ChatPage() {
           새 대화
         </Button>
       </div>
-
-      {showFilters && (
-        <div className="mx-4 mt-2 space-y-3 rounded-2xl border border-zinc-200 bg-white p-3">
-          <FilterGroup label="음식 종류">
-            <ChipRow>
-              {CUISINE_OPTIONS.map((option) => (
-                <ChoiceChip
-                  key={option}
-                  label={option}
-                  selected={cuisine === option}
-                  onClick={() => setCuisine(cuisine === option ? "" : option)}
-                />
-              ))}
-            </ChipRow>
-          </FilterGroup>
-
-          <FilterGroup label="가격대">
-            <ChipRow>
-              {PRICE_OPTIONS.map((option) => (
-                <ChoiceChip
-                  key={option}
-                  label={option}
-                  selected={priceLevel === option}
-                  onClick={() => setPriceLevel(priceLevel === option ? "" : option)}
-                />
-              ))}
-            </ChipRow>
-          </FilterGroup>
-
-        </div>
-      )}
 
       <div ref={threadRef} className="tf-scroll flex-1 space-y-5 overflow-y-auto px-4 py-5">
         {messages.map((message) =>
@@ -440,44 +386,6 @@ export function ChatPage() {
         </form>
       </div>
     </div>
-  );
-}
-
-function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-2">
-      <h3 className="text-xs font-bold text-zinc-500">{label}</h3>
-      {children}
-    </section>
-  );
-}
-
-function ChipRow({ children }: { children: React.ReactNode }) {
-  return <div className="flex flex-wrap gap-1.5">{children}</div>;
-}
-
-function ChoiceChip({
-  label,
-  selected,
-  onClick,
-}: {
-  label: string;
-  selected: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-        selected
-          ? "border-brand-300 bg-brand-100 text-brand-700"
-          : "border-brand-200 bg-brand-50 text-brand-700 hover:border-brand-300 hover:bg-brand-100",
-      )}
-    >
-      {label}
-    </button>
   );
 }
 
