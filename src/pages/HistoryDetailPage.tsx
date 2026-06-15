@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { listTasteAgentSessions, type TasteAgentMessage, type TasteAgentSession } from "../api";
+import { ArrowLeft, MessageCircle, MoreVertical, Trash2 } from "lucide-react";
+import {
+  deleteTasteAgentSession,
+  listTasteAgentSessions,
+  type TasteAgentMessage,
+  type TasteAgentSession,
+} from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
 import { RecommendationMessage } from "../components/RecommendationCards";
@@ -17,18 +22,40 @@ export function HistoryDetailPage() {
     (location.state as { session?: TasteAgentSession } | null)?.session ?? null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (session || !token || !sessionId) return;
-    listTasteAgentSessions(token)
+    listTasteAgentSessions(token, { session_id: sessionId, limit: 1 })
       .then((data) => {
-        setSession(data.sessions.find((item) => item.id === sessionId) ?? null);
+        const loadedSession = data.sessions[0] ?? null;
+        setSession(loadedSession);
+        if (!loadedSession) {
+          setError("대화 기록을 찾을 수 없습니다.");
+          return;
+        }
         setError(null);
       })
       .catch((caught) => {
         setError(caught instanceof Error ? caught.message : "대화 기록을 불러오지 못했습니다.");
       });
   }, [session, token, sessionId]);
+
+  async function handleDelete() {
+    if (!token || !session || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteTasteAgentSession(session.id, token);
+      navigate("/history");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "대화 기록 삭제에 실패했습니다.");
+      setDeleting(false);
+      setConfirmOpen(false);
+    }
+  }
 
   if (error) {
     return (
@@ -54,14 +81,59 @@ export function HistoryDetailPage() {
           <h2 className="truncate text-sm font-semibold text-zinc-900">{session.title}</h2>
           <p className="text-[11px] text-zinc-400">{formatDate(session.updated_at)}</p>
         </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => navigate("/chat", { state: { session } })}
-          disabled={!session.messages.length}
-        >
-          이어서 대화
-        </Button>
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMenuOpen((value) => !value)}
+            aria-label="더보기"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+          >
+            <MoreVertical size={18} />
+          </Button>
+          {menuOpen && (
+            <>
+              <button
+                type="button"
+                aria-hidden
+                tabIndex={-1}
+                onClick={() => setMenuOpen(false)}
+                className="fixed inset-0 z-40 cursor-default"
+              />
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-50 mt-1 w-36 overflow-hidden rounded-xl border border-zinc-200 bg-white py-1 shadow-lg"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate("/chat", { state: { session } });
+                  }}
+                  disabled={!session.messages.length}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-brand-700 transition-colors hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <MessageCircle size={14} />
+                  이어서 대화
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setConfirmOpen(true);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-brand-700 transition-colors hover:bg-brand-50"
+                >
+                  <Trash2 size={14} />
+                  삭제
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="tf-scroll flex-1 space-y-5 overflow-y-auto px-4 py-5">
@@ -79,6 +151,31 @@ export function HistoryDetailPage() {
           </div>
         )}
       </div>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-end bg-zinc-950/25 px-4 pb-4 sm:items-center sm:justify-center sm:p-4">
+          <section className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl">
+            <h2 className="text-sm font-semibold text-zinc-900">대화 기록을 삭제할까요?</h2>
+            <div className="mt-4 flex gap-2">
+              <Button
+                className="flex-1"
+                variant="secondary"
+                onClick={() => setConfirmOpen(false)}
+                disabled={deleting}
+              >
+                취소
+              </Button>
+              <Button
+                className="flex-1 bg-brand-300 text-brand-700 hover:bg-brand-200"
+                onClick={() => void handleDelete()}
+                disabled={deleting}
+              >
+                {deleting ? "삭제 중..." : "삭제"}
+              </Button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

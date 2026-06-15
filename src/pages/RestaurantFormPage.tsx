@@ -11,10 +11,11 @@ import {
 } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { Button, Field, TextArea, TextInput } from "../components/ui";
-import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
+import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY, shortCityLabel } from "../data/koreaRegions";
 import { cn, extractArea, extractCuisine } from "../lib/utils";
 
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
+const CUISINE_OPTIONS = ["한식", "일식", "중식", "양식", "분식", "카페", "술집", "기타"];
 
 export function RestaurantFormPage() {
   const { token } = useAuth();
@@ -108,7 +109,7 @@ export function RestaurantFormPage() {
     setRegionCity(region.city);
     setRegionDistrict(region.district);
     setArea(region.area || extractArea(place.address_name || place.road_address_name));
-    setCuisine(extractCuisine(place.category_name));
+    setCuisine(normalizeCuisine(place.category_name));
     setNote((current) =>
       current.trim()
         ? current
@@ -244,7 +245,9 @@ export function RestaurantFormPage() {
     }
   }
 
-  const canSave = editing ? name.trim() && area.trim() && cuisine.trim() : name.trim() && note.trim();
+  const canSave = editing
+    ? name.trim() && area.trim() && cuisine.trim()
+    : name.trim() && area.trim() && cuisine.trim() && note.trim();
 
   return (
     <div className="tf-scroll h-full overflow-y-auto">
@@ -297,14 +300,10 @@ export function RestaurantFormPage() {
             ) : manualEntry ? (
               <ManualFields
                 name={name}
-                area={area}
                 regionCity={regionCity}
                 regionDistrict={regionDistrict}
-                cuisine={cuisine}
                 onNameChange={setName}
-                onAreaChange={setArea}
                 onRegionChange={updateRegion}
-                onCuisineChange={setCuisine}
                 onBack={changePlace}
                 showBack
               />
@@ -360,6 +359,19 @@ export function RestaurantFormPage() {
                 )}
               </div>
             )}
+
+        <Field label="음식 종류">
+          <ChipRow>
+            {CUISINE_OPTIONS.map((option) => (
+              <ChoiceChip
+                key={option}
+                label={option}
+                selected={cuisine === option}
+                onClick={() => setCuisine(option)}
+              />
+            ))}
+          </ChipRow>
+        </Field>
 
         <Field label="가격대">
           <ChipRow>
@@ -441,26 +453,18 @@ export function RestaurantFormPage() {
 
 function ManualFields({
   name,
-  area,
   regionCity,
   regionDistrict,
-  cuisine,
   onNameChange,
-  onAreaChange,
   onRegionChange,
-  onCuisineChange,
   onBack,
   showBack = false,
 }: {
   name: string;
-  area: string;
   regionCity: string;
   regionDistrict: string;
-  cuisine: string;
   onNameChange: (value: string) => void;
-  onAreaChange: (value: string) => void;
   onRegionChange: (city: string, district?: string) => void;
-  onCuisineChange: (value: string) => void;
   onBack: () => void;
   showBack?: boolean;
 }) {
@@ -489,66 +493,42 @@ function ManualFields({
         <Field label="식당명">
           <TextInput value={name} onChange={(event) => onNameChange(event.target.value)} />
         </Field>
-        <Field label="지역 선택">
-          <div className="grid grid-cols-2 gap-2">
-            <RegionSelect
-              ariaLabel="시 선택"
-              placeholder="시"
-              options={CITY_OPTIONS}
-              value={regionCity}
-              onChange={(value) => onRegionChange(value)}
-            />
-            <RegionSelect
-              ariaLabel="군·구 선택"
-              placeholder="군·구"
-              options={districtOptions}
-              value={regionDistrict}
-              disabled={!regionCity || districtOptions.length === 0}
-              onChange={(value) => onRegionChange(regionCity, value)}
-            />
-          </div>
-        </Field>
-        <Field label="음식 종류">
-          <TextInput value={cuisine} onChange={(event) => onCuisineChange(event.target.value)} />
-        </Field>
+        <div className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-3">
+          <section className="space-y-2">
+            <h3 className="text-xs font-bold text-zinc-500">지역</h3>
+            <ChipRow>
+              {CITY_OPTIONS.map((city) => (
+                <ChoiceChip
+                  key={city}
+                  variant="brand"
+                  label={shortCityLabel(city)}
+                  selected={regionCity === city}
+                  onClick={() => onRegionChange(regionCity === city ? "" : city)}
+                />
+              ))}
+            </ChipRow>
+          </section>
+          {regionCity && districtOptions.length > 0 && (
+            <section className="space-y-2">
+              <h3 className="text-xs font-bold text-zinc-500">군·구</h3>
+              <ChipRow>
+                {districtOptions.map((district) => (
+                  <ChoiceChip
+                    key={district}
+                    variant="brand"
+                    label={district}
+                    selected={regionDistrict === district}
+                    onClick={() =>
+                      onRegionChange(regionCity, regionDistrict === district ? "" : district)
+                    }
+                  />
+                ))}
+              </ChipRow>
+            </section>
+          )}
+        </div>
       </div>
     </div>
-  );
-}
-
-function RegionSelect({
-  ariaLabel,
-  placeholder,
-  options,
-  value,
-  onChange,
-  disabled,
-}: {
-  ariaLabel: string;
-  placeholder: string;
-  options: string[];
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <select
-      aria-label={ariaLabel}
-      value={value}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-      className={cn(
-        "min-w-0 rounded-xl border border-zinc-200 bg-white px-2 py-2 text-xs font-medium outline-none transition focus:border-brand-300 focus:ring-2 focus:ring-brand-200 disabled:bg-zinc-50 disabled:text-zinc-300",
-        value ? "text-zinc-800" : "text-zinc-400",
-      )}
-    >
-      <option value="">{placeholder}</option>
-      {options.map((option) => (
-        <option key={option} value={option} className="text-zinc-800">
-          {option}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -560,10 +540,12 @@ function ChoiceChip({
   label,
   selected,
   onClick,
+  variant = "zinc",
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
+  variant?: "zinc" | "brand";
 }) {
   return (
     <button
@@ -573,7 +555,9 @@ function ChoiceChip({
         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         selected
           ? "border-brand-300 bg-brand-100 text-brand-700"
-          : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
+          : variant === "brand"
+            ? "border-brand-200 bg-brand-50 text-brand-700 hover:border-brand-300 hover:bg-brand-100"
+            : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300 hover:bg-zinc-50",
       )}
     >
       {label}
@@ -606,6 +590,16 @@ function parseRegionParts(source: string) {
   };
 }
 
+function normalizeCuisine(category: string) {
+  const normalized = category.replace(/\s+/g, "");
+  if (/카페|커피|디저트|베이커리/.test(normalized)) return "카페";
+  if (/술집|주점|호프|바$|이자카야/.test(normalized)) return "술집";
+  const matched = CUISINE_OPTIONS.find((option) => option !== "기타" && normalized.includes(option));
+  if (matched) return matched;
+  const extracted = extractCuisine(category);
+  return CUISINE_OPTIONS.includes(extracted) ? extracted : "기타";
+}
+
 
 function normalizeCity(value: string) {
   const aliases: Record<string, string> = {
@@ -631,5 +625,5 @@ function normalizeCity(value: string) {
 }
 
 function buildRegionArea(city: string, district = "") {
-  return [city, district].filter(Boolean).join(" ");
+  return [city ? shortCityLabel(city) : "", district].filter(Boolean).join(" ");
 }

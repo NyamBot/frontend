@@ -68,10 +68,11 @@ export type TasteAgentMessage = {
   retrieved_context: string[];
   metadata: {
     area?: string | null;
-    cuisine?: string | null;
-    price_level?: string | null;
+    cuisine?: string | string[] | null;
+    price_level?: string | string[] | null;
     tags?: string[];
     limit?: number;
+    request_id?: string | null;
     recommendation_count?: number;
     restaurant_names?: string[];
     recommendations?: RestaurantRecommendation[];
@@ -184,18 +185,22 @@ export async function createRestaurant(payload: {
 export async function listRestaurants(
   token: string,
   filters: {
-    city?: string;
-    district?: string;
-    town?: string;
+    city?: string | string[];
+    district?: string | string[];
+    town?: string | string[];
+    cuisine?: string | string[];
+    price_level?: string | string[];
     query?: string;
     limit?: number;
     offset?: number;
   } = {},
 ) {
   const params = new URLSearchParams();
-  if (filters.city) params.set("city", filters.city);
-  if (filters.district) params.set("district", filters.district);
-  if (filters.town) params.set("town", filters.town);
+  appendFilterParams(params, "city", filters.city);
+  appendFilterParams(params, "district", filters.district);
+  appendFilterParams(params, "town", filters.town);
+  appendFilterParams(params, "cuisine", filters.cuisine);
+  appendFilterParams(params, "price_level", filters.price_level);
   if (filters.query) params.set("query", filters.query);
   if (filters.limit) params.set("limit", String(filters.limit));
   if (filters.offset) params.set("offset", String(filters.offset));
@@ -205,6 +210,12 @@ export async function listRestaurants(
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to list restaurants"));
   return response.json() as Promise<Restaurant[]>;
+}
+
+function appendFilterParams(params: URLSearchParams, key: string, value?: string | string[]) {
+  if (!value) return;
+  const values = Array.isArray(value) ? value : [value];
+  values.filter(Boolean).forEach((item) => params.append(key, item));
 }
 
 export async function getRestaurant(restaurantId: string, token: string) {
@@ -280,11 +291,10 @@ export async function searchKakaoPlaces(query: string, size = 5) {
 export async function chatTasteAgent(payload: {
   user_id?: string | null;
   session_id?: string | null;
+  request_id?: string | null;
   query: string;
   message: string;
   area?: string | null;
-  cuisine?: string | null;
-  price_level?: string | null;
   tags: string[];
   latitude?: number | null;
   longitude?: number | null;
@@ -299,24 +309,80 @@ export async function chatTasteAgent(payload: {
   if (!response.ok) throw new Error(await parseError(response, "Failed to ask taste agent"));
   return response.json() as Promise<{
     session_id: string;
+    request_id: string;
+    cancelled: boolean;
     answer: string;
     recommendations: RestaurantRecommendation[];
     context: string[];
   }>;
 }
 
-export async function listTasteAgentMessages(token: string) {
-  const response = await fetch(`${API_URL}/restaurants/chat/messages`, {
+export async function cancelTasteAgentChat(
+  payload: { session_id?: string | null; request_id?: string | null },
+  token: string,
+) {
+  const response = await fetch(`${API_URL}/restaurants/chat/cancel`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+    keepalive: true,
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to cancel taste agent chat"));
+  return response.json() as Promise<{
+    cancelled: boolean;
+    session_id: string | null;
+    request_id: string | null;
+  }>;
+}
+
+export async function listTasteAgentMessages(
+  token: string,
+  options: { session_id?: string | null; limit?: number; offset?: number } = {},
+) {
+  const params = new URLSearchParams();
+  if (options.session_id) params.set("session_id", options.session_id);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  const query = params.toString();
+  const response = await fetch(`${API_URL}/restaurants/chat/messages${query ? `?${query}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to list taste agent messages"));
-  return response.json() as Promise<{ user_id: string | null; messages: TasteAgentMessage[] }>;
+  return response.json() as Promise<{
+    user_id: string | null;
+    messages: TasteAgentMessage[];
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  }>;
 }
 
-export async function listTasteAgentSessions(token: string) {
-  const response = await fetch(`${API_URL}/restaurants/chat/sessions`, {
+export async function listTasteAgentSessions(
+  token: string,
+  options: { session_id?: string | null; limit?: number; offset?: number } = {},
+) {
+  const params = new URLSearchParams();
+  if (options.session_id) params.set("session_id", options.session_id);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  const query = params.toString();
+  const response = await fetch(`${API_URL}/restaurants/chat/sessions${query ? `?${query}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!response.ok) throw new Error(await parseError(response, "Failed to list taste agent sessions"));
-  return response.json() as Promise<{ user_id: string | null; sessions: TasteAgentSession[] }>;
+  return response.json() as Promise<{
+    user_id: string | null;
+    sessions: TasteAgentSession[];
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  }>;
+}
+
+export async function deleteTasteAgentSession(sessionId: string, token: string) {
+  const response = await fetch(`${API_URL}/restaurants/chat/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to delete taste agent session"));
 }

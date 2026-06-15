@@ -1,48 +1,54 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronRight, RefreshCw } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { listTasteAgentSessions, type TasteAgentSession } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
+import { Button } from "../components/ui";
+
+const PAGE_SIZE = 20;
 
 export function HistoryPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<TasteAgentSession[]>([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void refresh();
+    void refresh(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function refresh() {
-    if (!token) return;
+  async function refresh(reset = false) {
+    if (!token || loading) return;
+    const offset = reset ? 0 : sessions.length;
+    setLoading(true);
     try {
-      const data = await listTasteAgentSessions(token);
-      setSessions(data.sessions);
+      const data = await listTasteAgentSessions(token, { limit: PAGE_SIZE, offset });
+      setSessions((prev) => (reset ? data.sessions : [...prev, ...data.sessions]));
+      setHasMore(data.has_more);
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "기록을 불러오지 못했습니다.");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div className="tf-scroll h-full overflow-y-auto">
-      <div className="space-y-3 p-4">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs font-medium text-zinc-500">대화 {sessions.length}개</span>
-          <button
-            type="button"
-            onClick={refresh}
-            className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100"
-          >
-            <RefreshCw size={13} />
-            새로고침
-          </button>
-        </div>
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 border-b border-zinc-100 px-4 py-3">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/mypage")} aria-label="뒤로 가기">
+          <ArrowLeft size={18} />
+        </Button>
+        <h2 className="truncate text-sm font-semibold text-zinc-900">대화 기록</h2>
+      </div>
 
-        {error && (
+      <div className="tf-scroll flex-1 overflow-y-auto">
+        <div className="space-y-3 p-4">
+          {error && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-600">
             {error}
           </div>
@@ -58,10 +64,9 @@ export function HistoryPage() {
                 className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-brand-50"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="line-clamp-1 text-sm font-medium text-zinc-900">
+                  <span className="line-clamp-1 w-full text-sm font-medium leading-snug text-zinc-900">
                     {getSessionTitle(session)}
-                  </div>
-                  <div className="mt-0.5 text-[11px] text-zinc-400">{formatDate(session.updated_at)}</div>
+                  </span>
                 </div>
                 <ChevronRight size={16} className="shrink-0 text-zinc-300" />
               </button>
@@ -69,7 +74,18 @@ export function HistoryPage() {
           </div>
         )}
 
-        {!sessions.length && !error && (
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => void refresh(false)}
+            disabled={loading}
+            className="w-full rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "불러오는 중..." : "더 보기"}
+          </button>
+        )}
+
+        {!sessions.length && !error && !loading && (
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <MiniMascot className="h-14 w-14" />
             <span className="text-sm text-zinc-400">
@@ -79,6 +95,7 @@ export function HistoryPage() {
             </span>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -89,13 +106,4 @@ function getSessionTitle(session: TasteAgentSession) {
   if (title) return title;
   const firstQuestion = session.messages.find((message) => message.role === "user")?.content;
   return firstQuestion ?? "새 대화";
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("ko-KR", {
-    month: "long",
-    day: "numeric",
-  }).format(date);
 }

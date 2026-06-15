@@ -1,20 +1,30 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { SlidersHorizontal } from "lucide-react";
 import { cn } from "../lib/utils";
 import { listRestaurants, type Restaurant } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
 import { Button, Tag, TextInput } from "../components/ui";
-import { CITY_OPTIONS, DISTRICT_OPTIONS_BY_CITY } from "../data/koreaRegions";
+import {
+  CITY_OPTIONS,
+  DISTRICT_OPTIONS_BY_CITY,
+  shortCityLabel,
+  shortRegionLabel,
+} from "../data/koreaRegions";
 
 const PAGE_SIZE = 50;
+const CUISINE_OPTIONS = ["한식", "일식", "중식", "양식", "분식", "카페", "술집", "기타"];
+const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
 
 export function RestaurantsPage() {
   const { token } = useAuth();
   const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [selectedCity, setSelectedCity] = useState("");
-  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedCities, setSelectedCities] = useState<string[]>([]);
+  const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
+  const [selectedCuisines, setSelectedCuisines] = useState<string[]>([]);
+  const [selectedPriceLevels, setSelectedPriceLevels] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showRegions, setShowRegions] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +34,7 @@ export function RestaurantsPage() {
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, selectedCity, selectedDistrict, searchQuery]);
+  }, [token, selectedCities, selectedDistricts, selectedCuisines, selectedPriceLevels, searchQuery]);
 
   async function refresh() {
     if (!token) return;
@@ -39,8 +49,10 @@ export function RestaurantsPage() {
   async function loadRestaurantPage(offset: number) {
     if (!token) return [];
     const page = await listRestaurants(token, {
-      city: selectedCity,
-      district: selectedDistrict,
+      city: selectedCities,
+      district: selectedDistricts,
+      cuisine: selectedCuisines,
+      price_level: selectedPriceLevels,
       query: searchQuery.trim(),
       limit: PAGE_SIZE + 1,
       offset,
@@ -72,13 +84,47 @@ export function RestaurantsPage() {
     [restaurants],
   );
   const cityOptions = CITY_OPTIONS;
-  const districtOptions = selectedCity ? DISTRICT_OPTIONS_BY_CITY[selectedCity] ?? [] : [];
+  const districtOptions = useMemo(
+    () => (selectedCities[0] ? DISTRICT_OPTIONS_BY_CITY[selectedCities[0]] ?? [] : []),
+    [selectedCities],
+  );
   const filteredRows = locationRows.filter((row) => {
-    if (!regionMatches(row.location.city, selectedCity)) return false;
-    if (!regionMatches(row.location.district, selectedDistrict)) return false;
+    if (!regionMatchesAny(row.location.city, selectedCities)) return false;
+    if (!regionMatchesAny(row.location.district, selectedDistricts)) return false;
+    if (!regionMatchesAny(row.restaurant.cuisine, selectedCuisines)) return false;
+    if (!regionMatchesAny(row.restaurant.price_level, selectedPriceLevels)) return false;
     return true;
   });
-  const hasLocationFilter = Boolean(selectedCity || selectedDistrict || searchQuery.trim());
+  const hasLocationFilter = Boolean(
+    selectedCities.length ||
+      selectedDistricts.length ||
+      selectedCuisines.length ||
+      selectedPriceLevels.length ||
+      searchQuery.trim(),
+  );
+  function toggleCity(city: string) {
+    setSelectedCities((current) => {
+      const next = current.includes(city) ? [] : [city];
+      setSelectedDistricts([]);
+      return next;
+    });
+  }
+
+  function toggleDistrict(district: string) {
+    setSelectedDistricts((current) => toggleSelection(current, district));
+  }
+
+  function toggleCuisine(cuisine: string) {
+    setSelectedCuisines((current) => toggleSelection(current, cuisine));
+  }
+
+  function togglePriceLevel(priceLevel: string) {
+    setSelectedPriceLevels((current) => toggleSelection(current, priceLevel));
+  }
+
+  function clearActiveCityDistricts() {
+    setSelectedDistricts([]);
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -86,61 +132,109 @@ export function RestaurantsPage() {
         <div className="flex flex-col gap-3 p-4">
         {(restaurants.length > 0 || hasLocationFilter) && (
           <div className="space-y-2">
-            <TextInput
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="식당명, 지역, 음식 종류, 태그 검색"
-            />
-            <button
-              type="button"
-              onClick={() => setShowRegions((value) => !value)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                showRegions || selectedCity
-                  ? "border-brand-300 bg-brand-100 text-brand-700"
-                  : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100",
-              )}
-            >
-              {selectedCity ? `${selectedCity}${selectedDistrict ? ` ${selectedDistrict}` : ""}` : "지역"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowRegions((value) => !value)}
+                className={cn(
+                  "inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-2 text-xs font-medium transition-colors",
+                  showRegions || hasLocationFilter
+                    ? "border-brand-300 bg-brand-100 text-brand-700"
+                    : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100",
+                )}
+              >
+                <SlidersHorizontal size={13} />
+                검색 조건
+              </button>
+              <TextInput
+                className="flex-1"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="식당명, 지역, 음식 종류, 태그 검색"
+              />
+            </div>
             {showRegions && (
-              <>
+              <div className="space-y-3 rounded-2xl border border-zinc-200 bg-white p-3">
                 {cityOptions.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {cityOptions.map((city) => (
+                  <section className="space-y-2">
+                    <h3 className="text-xs font-bold text-zinc-500">시·도</h3>
+                    <div className="flex flex-wrap gap-1.5">
                       <FilterChip
-                        key={city}
-                        label={city}
-                        selected={selectedCity === city}
+                        label="전체"
+                        selected={selectedCities.length === 0}
                         onClick={() => {
-                          const next = selectedCity === city ? "" : city;
-                          setSelectedCity(next);
-                          setSelectedDistrict("");
-                          if (next && (DISTRICT_OPTIONS_BY_CITY[next] ?? []).length === 0) {
-                            setShowRegions(false);
-                          }
+                          setSelectedCities([]);
+                          setSelectedDistricts([]);
                         }}
+                      />
+                      {cityOptions.map((city) => (
+                        <FilterChip
+                          key={city}
+                          label={shortCityLabel(city)}
+                          selected={selectedCities.includes(city)}
+                          onClick={() => toggleCity(city)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+                {selectedCities.length > 0 && districtOptions.length > 0 && (
+                  <section className="space-y-2">
+                    <h3 className="text-xs font-bold text-zinc-500">시·군·구</h3>
+                    <div className="flex flex-wrap gap-1.5">
+                      <FilterChip
+                        label="전체"
+                        selected={!districtOptions.some((district) => selectedDistricts.includes(district))}
+                        onClick={clearActiveCityDistricts}
+                      />
+                      {districtOptions.map((district) => (
+                        <FilterChip
+                          key={district}
+                          label={district}
+                          selected={selectedDistricts.includes(district)}
+                          onClick={() => toggleDistrict(district)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+                <section className="space-y-2">
+                  <h3 className="text-xs font-bold text-zinc-500">음식 종류</h3>
+                  <div className="flex flex-wrap gap-1.5">
+                    <FilterChip
+                      label="전체"
+                      selected={selectedCuisines.length === 0}
+                      onClick={() => setSelectedCuisines([])}
+                    />
+                    {CUISINE_OPTIONS.map((cuisine) => (
+                      <FilterChip
+                        key={cuisine}
+                        label={cuisine}
+                        selected={selectedCuisines.includes(cuisine)}
+                        onClick={() => toggleCuisine(cuisine)}
                       />
                     ))}
                   </div>
-                )}
-                {selectedCity && districtOptions.length > 0 && (
+                </section>
+                <section className="space-y-2">
+                  <h3 className="text-xs font-bold text-zinc-500">가격대</h3>
                   <div className="flex flex-wrap gap-1.5">
-                    {districtOptions.map((district) => (
+                    <FilterChip
+                      label="전체"
+                      selected={selectedPriceLevels.length === 0}
+                      onClick={() => setSelectedPriceLevels([])}
+                    />
+                    {PRICE_OPTIONS.map((priceLevel) => (
                       <FilterChip
-                        key={district}
-                        label={district}
-                        selected={selectedDistrict === district}
-                        onClick={() => {
-                          const next = selectedDistrict === district ? "" : district;
-                          setSelectedDistrict(next);
-                          if (next) setShowRegions(false);
-                        }}
+                        key={priceLevel}
+                        label={priceLevel}
+                        selected={selectedPriceLevels.includes(priceLevel)}
+                        onClick={() => togglePriceLevel(priceLevel)}
                       />
                     ))}
                   </div>
-                )}
-              </>
+                </section>
+              </div>
             )}
           </div>
         )}
@@ -167,7 +261,7 @@ export function RestaurantsPage() {
                 </strong>
               </div>
               <span className="text-xs text-zinc-500">
-                {restaurant.area} · {restaurant.cuisine} · {restaurant.price_level}
+                {shortRegionLabel(restaurant.area)} · {restaurant.cuisine} · {restaurant.price_level}
               </span>
               {restaurant.mood_tags.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1.5">
@@ -244,6 +338,10 @@ function FilterChip({
   );
 }
 
+function toggleSelection(values: string[], value: string) {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
 function parseLocationParts(restaurant: Restaurant) {
   if (restaurant.city || restaurant.district || restaurant.town) {
     return {
@@ -270,6 +368,10 @@ function parseLocationParts(restaurant: Restaurant) {
     district: parts[1] ?? restaurant.area,
     town: parts.find((part, index) => index > 1 && /(동|읍|면|리)$/.test(part)) ?? "",
   };
+}
+
+function regionMatchesAny(actual: string, selectedValues: string[]) {
+  return selectedValues.length === 0 || selectedValues.some((selected) => regionMatches(actual, selected));
 }
 
 function regionMatches(actual: string, selected: string) {

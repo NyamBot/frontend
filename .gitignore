@@ -4,3 +4,5 @@ dist/
 tsconfig.tsbuildinfo
 .idea/
 *.md
+!docs/
+!docs/*.md
