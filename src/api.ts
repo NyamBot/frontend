@@ -1,10 +1,9 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+const DEFAULT_API_BASE = import.meta.env.PROD ? "" : "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE;
+const API_PREFIX = import.meta.env.VITE_API_PREFIX ?? "/api/v1";
+const API_URL = `${API_BASE}${API_PREFIX}`;
 
-export type SourceResponse = {
-  id: string;
-  title: string;
-  chunk_count: number;
-};
+export const KAKAO_LOGIN_URL = `${API_URL}/auth/kakao/login`;
 
 export type User = {
   id: string;
@@ -17,51 +16,117 @@ export type User = {
   last_login_at: string | null;
 };
 
-export type ClipIdea = {
+export type Restaurant = {
   id: string;
-  title: string;
-  hook: string;
-  summary: string;
-  platform: string;
-  duration_seconds: number;
-  hook_score: number;
-  audience_angle: string;
-  cta: string;
-  platform_fit: string;
-  source_moments: string[];
+  user_id: string | null;
+  name: string;
+  area: string;
+  city: string | null;
+  district: string | null;
+  town: string | null;
+  cuisine: string;
+  price_level: string;
+  mood_tags: string[];
+  signature_menus: string[];
+  kakao_place_id: string | null;
+  kakao_place_url: string | null;
+  address: string | null;
+  road_address: string | null;
+  phone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  note_count: number;
+  created_at: string;
 };
 
-export type ScriptPack = {
-  title: string;
-  hook: string;
-  scene_plan: string[];
-  captions: string[];
-  b_roll: string[];
-  audio_direction: string[];
-  hashtags: string[];
-  license_checklist: string[];
+export type KakaoPlace = {
+  id: string;
+  place_name: string;
+  category_name: string;
+  address_name: string;
+  road_address_name: string;
+  phone: string;
+  place_url: string;
+  x: string;
+  y: string;
 };
 
-export async function createSource(payload: {
-  user_id?: string | null;
+export type RestaurantRecommendation = {
+  restaurant: Restaurant;
+  reason: string;
+  evidence: string[];
+  menu_tip: string;
+  caution: string;
+  score: number;
+};
+
+export type TasteAgentMessage = {
+  id: string;
+  session_id: string | null;
+  user_id: string | null;
+  role: "user" | "assistant";
+  content: string;
+  retrieved_context: string[];
+  metadata: {
+    area?: string | null;
+    cuisine?: string | string[] | null;
+    price_level?: string | string[] | null;
+    tags?: string[];
+    limit?: number;
+    request_id?: string | null;
+    recommendation_count?: number;
+    restaurant_names?: string[];
+    recommendations?: RestaurantRecommendation[];
+  };
+  created_at: string;
+};
+
+export type TasteAgentSession = {
+  id: string;
+  user_id: string | null;
   title: string;
-  transcript: string;
-  audience: string;
-  platform: string;
-  tone: string;
-  goal?: string;
-}) {
-  const response = await fetch(`${API_BASE}/api/sources`, {
+  created_at: string;
+  updated_at: string;
+  messages: TasteAgentMessage[];
+};
+
+function authHeaders(token: string) {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+}
+
+async function parseError(response: Response, fallback: string) {
+  try {
+    const data = await response.json();
+    if (typeof data.detail === "string") return data.detail;
+  } catch {
+    // Ignore non-JSON error bodies.
+  }
+  return fallback;
+}
+
+export async function getCurrentUser(token: string) {
+  const response = await fetch(`${API_URL}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load current user"));
+  return response.json() as Promise<User>;
+}
+
+export async function exchangeAuthCode(code: string) {
+  const response = await fetch(`${API_URL}/auth/session`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ code }),
   });
-  if (!response.ok) throw new Error("Failed to create source");
-  return response.json() as Promise<SourceResponse>;
+  if (!response.ok) throw new Error(await parseError(response, "Failed to complete login"));
+  return response.json() as Promise<{ access_token: string; token_type: "bearer" }>;
 }
 
 export async function listUsers() {
-  const response = await fetch(`${API_BASE}/api/users`);
+  const response = await fetch(`${API_URL}/users`);
   if (!response.ok) throw new Error("Failed to list users");
   return response.json() as Promise<User[]>;
 }
@@ -73,7 +138,7 @@ export async function createUser(payload: {
   auth_provider?: string;
   provider_subject?: string | null;
 }) {
-  const response = await fetch(`${API_BASE}/api/users`, {
+  const response = await fetch(`${API_URL}/users`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -82,29 +147,243 @@ export async function createUser(payload: {
   return response.json() as Promise<User>;
 }
 
-export async function generateIdeas(sourceId: string, title: string, platform: string) {
-  const response = await fetch(`${API_BASE}/api/clips/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      source_id: sourceId,
-      title,
-      platform,
-      audience: "general creators",
-      goal: "awareness",
-      count: 3,
-    }),
+export async function deleteCurrentUser(token: string) {
+  const response = await fetch(`${API_URL}/users/me`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) throw new Error("Failed to generate clip ideas");
-  return response.json() as Promise<{ source_id: string; ideas: ClipIdea[] }>;
+  if (!response.ok) throw new Error(await parseError(response, "Failed to delete current user"));
 }
 
-export async function generateScript(sourceId: string, idea: ClipIdea) {
-  const response = await fetch(`${API_BASE}/api/clips/script`, {
+export async function createRestaurant(payload: {
+  name: string;
+  area: string;
+  city?: string | null;
+  district?: string | null;
+  town?: string | null;
+  cuisine: string;
+  price_level: string;
+  mood_tags: string[];
+  signature_menus: string[];
+  note: string;
+  kakao_place_id?: string | null;
+  kakao_place_url?: string | null;
+  address?: string | null;
+  road_address?: string | null;
+  phone?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}, token: string) {
+  const response = await fetch(`${API_URL}/restaurants`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ source_id: sourceId, idea }),
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
   });
-  if (!response.ok) throw new Error("Failed to generate script");
-  return response.json() as Promise<ScriptPack>;
+  if (!response.ok) throw new Error(await parseError(response, "Failed to create restaurant"));
+  return response.json() as Promise<Restaurant>;
+}
+
+export async function listRestaurants(
+  token: string,
+  filters: {
+    city?: string | string[];
+    district?: string | string[];
+    town?: string | string[];
+    cuisine?: string | string[];
+    price_level?: string | string[];
+    query?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
+) {
+  const params = new URLSearchParams();
+  appendFilterParams(params, "city", filters.city);
+  appendFilterParams(params, "district", filters.district);
+  appendFilterParams(params, "town", filters.town);
+  appendFilterParams(params, "cuisine", filters.cuisine);
+  appendFilterParams(params, "price_level", filters.price_level);
+  if (filters.query) params.set("query", filters.query);
+  if (filters.limit) params.set("limit", String(filters.limit));
+  if (filters.offset) params.set("offset", String(filters.offset));
+  const query = params.toString();
+  const response = await fetch(`${API_URL}/restaurants${query ? `?${query}` : ""}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to list restaurants"));
+  return response.json() as Promise<Restaurant[]>;
+}
+
+function appendFilterParams(params: URLSearchParams, key: string, value?: string | string[]) {
+  if (!value) return;
+  const values = Array.isArray(value) ? value : [value];
+  values.filter(Boolean).forEach((item) => params.append(key, item));
+}
+
+export async function getRestaurant(restaurantId: string, token: string) {
+  const response = await fetch(`${API_URL}/restaurants/${encodeURIComponent(restaurantId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to load restaurant"));
+  return response.json() as Promise<Restaurant>;
+}
+
+export async function updateRestaurant(
+  restaurantId: string,
+  payload: {
+    name: string;
+    area: string;
+    city?: string | null;
+    district?: string | null;
+    town?: string | null;
+    cuisine: string;
+    price_level: string;
+    mood_tags: string[];
+    kakao_place_id?: string | null;
+    kakao_place_url?: string | null;
+    address?: string | null;
+    road_address?: string | null;
+    phone?: string | null;
+    latitude?: number | null;
+    longitude?: number | null;
+  },
+  token: string,
+) {
+  const response = await fetch(`${API_URL}/restaurants/${encodeURIComponent(restaurantId)}`, {
+    method: "PUT",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to update restaurant"));
+  return response.json() as Promise<Restaurant>;
+}
+
+export async function addRestaurantNote(
+  restaurantId: string,
+  payload: {
+    content: string;
+    tags: string[];
+  },
+  token: string,
+) {
+  const response = await fetch(`${API_URL}/restaurants/${encodeURIComponent(restaurantId)}/notes`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to add restaurant note"));
+  return response.json() as Promise<Restaurant>;
+}
+
+export async function deleteRestaurant(restaurantId: string, token: string) {
+  const response = await fetch(`${API_URL}/restaurants/${encodeURIComponent(restaurantId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to delete restaurant"));
+}
+
+export async function searchKakaoPlaces(query: string, size = 5) {
+  const params = new URLSearchParams({ query, size: String(size) });
+  const response = await fetch(`${API_URL}/restaurants/kakao/search?${params.toString()}`);
+  if (!response.ok) throw new Error("Failed to search Kakao places");
+  return response.json() as Promise<{ query: string; places: KakaoPlace[] }>;
+}
+
+export async function chatTasteAgent(payload: {
+  user_id?: string | null;
+  session_id?: string | null;
+  request_id?: string | null;
+  query: string;
+  message: string;
+  area?: string | null;
+  tags: string[];
+  latitude?: number | null;
+  longitude?: number | null;
+  limit?: number;
+}, token: string, signal?: AbortSignal) {
+  const response = await fetch(`${API_URL}/restaurants/chat`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+    signal,
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to ask taste agent"));
+  return response.json() as Promise<{
+    session_id: string;
+    request_id: string;
+    cancelled: boolean;
+    answer: string;
+    recommendations: RestaurantRecommendation[];
+    context: string[];
+  }>;
+}
+
+export async function cancelTasteAgentChat(
+  payload: { session_id?: string | null; request_id?: string | null },
+  token: string,
+) {
+  const response = await fetch(`${API_URL}/restaurants/chat/cancel`, {
+    method: "POST",
+    headers: authHeaders(token),
+    body: JSON.stringify(payload),
+    keepalive: true,
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to cancel taste agent chat"));
+  return response.json() as Promise<{
+    cancelled: boolean;
+    session_id: string | null;
+    request_id: string | null;
+  }>;
+}
+
+export async function listTasteAgentMessages(
+  token: string,
+  options: { session_id?: string | null; limit?: number; offset?: number } = {},
+) {
+  const params = new URLSearchParams();
+  if (options.session_id) params.set("session_id", options.session_id);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  const query = params.toString();
+  const response = await fetch(`${API_URL}/restaurants/chat/messages${query ? `?${query}` : ""}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to list taste agent messages"));
+  return response.json() as Promise<{
+    user_id: string | null;
+    messages: TasteAgentMessage[];
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  }>;
+}
+
+export async function listTasteAgentSessions(
+  token: string,
+  options: { session_id?: string | null; limit?: number; offset?: number } = {},
+) {
+  const params = new URLSearchParams();
+  if (options.session_id) params.set("session_id", options.session_id);
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) params.set("offset", String(options.offset));
+  const query = params.toString();
+  const response = await fetch(`${API_URL}/restaurants/chat/sessions${query ? `?${query}` : ""}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to list taste agent sessions"));
+  return response.json() as Promise<{
+    user_id: string | null;
+    sessions: TasteAgentSession[];
+    limit: number;
+    offset: number;
+    has_more: boolean;
+  }>;
+}
+
+export async function deleteTasteAgentSession(sessionId: string, token: string) {
+  const response = await fetch(`${API_URL}/restaurants/chat/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error(await parseError(response, "Failed to delete taste agent session"));
 }
