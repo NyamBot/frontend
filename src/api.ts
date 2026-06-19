@@ -289,6 +289,8 @@ export async function searchKakaoPlaces(query: string, size = 5) {
   return response.json() as Promise<{ query: string; places: KakaoPlace[] }>;
 }
 
+export type ChatSearchMode = "normal" | "advanced";
+
 export async function chatTasteAgent(payload: {
   user_id?: string | null;
   session_id?: string | null;
@@ -300,6 +302,7 @@ export async function chatTasteAgent(payload: {
   latitude?: number | null;
   longitude?: number | null;
   limit?: number;
+  search_mode?: ChatSearchMode;
 }, token: string, signal?: AbortSignal) {
   const response = await fetch(`${API_URL}/restaurants/chat`, {
     method: "POST",
