@@ -4,6 +4,7 @@ import { AlertTriangle, MapPin, MapPinOff, RefreshCw, Send, Square, SquarePen } 
 import {
   cancelTasteAgentChat,
   chatTasteAgent,
+  type ChatSearchMode,
   type RestaurantRecommendation,
   type TasteAgentMessage,
   type TasteAgentSession,
@@ -27,6 +28,7 @@ export function ChatPage() {
   const [recommendations, setRecommendations] = useState<RestaurantRecommendation[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [searchMode, setSearchMode] = useState<ChatSearchMode>("normal");
   const [useLocation, setUseLocation] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "ready" | "failed">("idle");
@@ -151,6 +153,7 @@ export function ChatPage() {
           latitude: useLocation ? currentLocation?.latitude ?? null : null,
           longitude: useLocation ? currentLocation?.longitude ?? null : null,
           limit: 3,
+          search_mode: searchMode,
         },
         created_at: new Date().toISOString(),
       },
@@ -167,6 +170,7 @@ export function ChatPage() {
           latitude: useLocation ? currentLocation?.latitude ?? null : null,
           longitude: useLocation ? currentLocation?.longitude ?? null : null,
           limit: 3,
+          search_mode: searchMode,
         },
         token,
         abortController.signal,
@@ -206,6 +210,7 @@ export function ChatPage() {
             recommendation_count: response.recommendations.length,
             restaurant_names: response.recommendations.map((recommendation) => recommendation.restaurant.name),
             recommendations: response.recommendations,
+            search_mode: searchMode,
           },
           created_at: new Date().toISOString(),
         },
@@ -354,6 +359,24 @@ export function ChatPage() {
       )}
 
       <div className="border-t border-zinc-200 bg-white px-4 py-3">
+        <div className="mb-2 inline-flex rounded-xl border border-zinc-200 bg-zinc-50 p-1">
+          {(["normal", "advanced"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setSearchMode(mode)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                searchMode === mode
+                  ? "bg-white text-brand-700 shadow-sm"
+                  : "text-zinc-500 hover:bg-white/70 hover:text-zinc-700",
+              )}
+              aria-pressed={searchMode === mode}
+            >
+              {mode === "normal" ? "Normal" : "Advanced"}
+            </button>
+          ))}
+        </div>
         <form
           onSubmit={(event) => {
             event.preventDefault();
