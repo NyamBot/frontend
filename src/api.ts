@@ -77,6 +77,7 @@ export type TasteAgentMessage = {
     recommendation_count?: number;
     restaurant_names?: string[];
     recommendations?: RestaurantRecommendation[];
+    search_mode?: ChatSearchMode;
   };
   created_at: string;
 };

@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation as useRouteLocation } from "react-router-dom";
-import { AlertTriangle, MapPin, MapPinOff, RefreshCw, Send, Square, SquarePen } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  MapPin,
+  MapPinOff,
+  RefreshCw,
+  Square,
+  SquarePen,
+} from "lucide-react";
 import {
   cancelTasteAgentChat,
   chatTasteAgent,
@@ -12,13 +22,18 @@ import {
 import { useAuth } from "../auth/AuthContext";
 import { MiniMascot } from "../components/Mascot";
 import { RecommendationMessage } from "../components/RecommendationCards";
-import { Button, TextInput } from "../components/ui";
+import { Button } from "../components/ui";
 import { cn } from "../lib/utils";
 
 const QUICK_QUERIES = [
   "조용한 데이트 맛집 골라줘",
   "혼밥하기 좋은 곳 추천해줘",
   "회식으로 무난한 맛집 골라줘",
+];
+
+const CHAT_SEARCH_MODES: { value: ChatSearchMode; label: string }[] = [
+  { value: "normal", label: "보통" },
+  { value: "advanced", label: "높음" },
 ];
 
 export function ChatPage() {
@@ -32,10 +47,12 @@ export function ChatPage() {
   const [useLocation, setUseLocation] = useState(true);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<"idle" | "loading" | "ready" | "failed">("idle");
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const threadRef = useRef<HTMLDivElement>(null);
+  const modeMenuRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeRequestIdRef = useRef<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
@@ -54,6 +71,19 @@ export function ChatPage() {
   useEffect(() => {
     requestCurrentLocation();
   }, []);
+
+  useEffect(() => {
+    if (!modeMenuOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!modeMenuRef.current?.contains(event.target as Node)) {
+        setModeMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [modeMenuOpen]);
 
   useEffect(() => {
     const routeSession = (location.state as { session?: TasteAgentSession } | null)?.session ?? null;
@@ -245,6 +275,7 @@ export function ChatPage() {
   }
 
   const hasThread = messages.length > 0;
+  const selectedSearchMode = CHAT_SEARCH_MODES.find((mode) => mode.value === searchMode) ?? CHAT_SEARCH_MODES[0];
 
   return (
     <div className="flex h-full flex-col">
@@ -359,30 +390,12 @@ export function ChatPage() {
       )}
 
       <div className="border-t border-zinc-200 bg-white px-4 py-3">
-        <div className="mb-2 inline-flex rounded-xl border border-zinc-200 bg-zinc-50 p-1">
-          {(["normal", "advanced"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setSearchMode(mode)}
-              className={cn(
-                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
-                searchMode === mode
-                  ? "bg-white text-brand-700 shadow-sm"
-                  : "text-zinc-500 hover:bg-white/70 hover:text-zinc-700",
-              )}
-              aria-pressed={searchMode === mode}
-            >
-              {mode === "normal" ? "Normal" : "Advanced"}
-            </button>
-          ))}
-        </div>
         <form
           onSubmit={(event) => {
             event.preventDefault();
             void handleAsk();
           }}
-          className="flex items-end gap-2 rounded-2xl border border-zinc-200 bg-white p-2 focus-within:border-brand-300 focus-within:ring-2 focus-within:ring-brand-200"
+          className="rounded-2xl border border-zinc-200 bg-white p-2 focus-within:border-brand-300 focus-within:ring-2 focus-within:ring-brand-200"
         >
           <textarea
             value={query}
@@ -395,17 +408,62 @@ export function ChatPage() {
             }}
             rows={1}
             placeholder="예: 성수에서 조용한 데이트 맛집 골라줘"
-            className="max-h-32 flex-1 resize-none bg-transparent px-2 py-1.5 text-sm text-zinc-800 placeholder:text-zinc-400 outline-none"
+            className="max-h-32 min-h-[42px] w-full resize-none bg-transparent px-2 py-1.5 text-sm text-zinc-800 placeholder:text-zinc-400 outline-none"
           />
-          <Button
-            type={loading ? "button" : "submit"}
-            size="icon"
-            disabled={!loading && !query.trim()}
-            aria-label={loading ? "응답 중지" : "전송"}
-            onClick={loading ? () => stopResponse() : undefined}
-          >
-            {loading ? <Square size={16} /> : <Send size={16} />}
-          </Button>
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <div ref={modeMenuRef} className="relative">
+              {modeMenuOpen && (
+                <div className="absolute bottom-full left-0 z-20 mb-2 w-40 rounded-2xl border border-zinc-200 bg-white p-1.5 text-sm shadow-xl shadow-zinc-900/10">
+                  {CHAT_SEARCH_MODES.map((mode) => (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      onClick={() => {
+                        setSearchMode(mode.value);
+                        setModeMenuOpen(false);
+                      }}
+                      className={cn(
+                        "flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors",
+                        searchMode === mode.value
+                          ? "bg-brand-100 text-brand-700"
+                          : "text-zinc-600 hover:bg-brand-50 hover:text-brand-700",
+                      )}
+                    >
+                      <span>{mode.label}</span>
+                      {searchMode === mode.value && <Check size={15} className="text-brand-600" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setModeMenuOpen((open) => !open)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-brand-50 px-2.5 text-xs font-semibold text-brand-700 transition-colors hover:bg-brand-100"
+                aria-expanded={modeMenuOpen}
+                aria-haspopup="menu"
+              >
+                {selectedSearchMode.label}
+                <ChevronDown
+                  size={13}
+                  className={cn("text-brand-500 transition-transform", modeMenuOpen && "rotate-180")}
+                />
+              </button>
+            </div>
+            <button
+              type={loading ? "button" : "submit"}
+              disabled={!loading && !query.trim()}
+              aria-label={loading ? "응답 중지" : "전송"}
+              onClick={loading ? () => stopResponse() : undefined}
+              className={cn(
+                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400",
+                loading || query.trim()
+                  ? "bg-brand-300 text-leaf-600 hover:bg-brand-200"
+                  : "cursor-not-allowed bg-brand-100 text-brand-500",
+              )}
+            >
+              {loading ? <Square size={14} fill="currentColor" /> : <ArrowUp size={18} strokeWidth={2.5} />}
+            </button>
+          </div>
         </form>
       </div>
     </div>
