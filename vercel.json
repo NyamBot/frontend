@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/v1/:path*",
-      "destination": "http://nyambot.kro.kr/api/v1/:path*"
+      "destination": "https://nyambot.n-e.kr/api/v1/:path*"
     },
     {
       "source": "/:path*",
