@@ -74,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (completingAuth) return;
     if (!token) {
       setUser(null);
+      setAuthError(null);
       setInitialized(true);
       return;
     }
@@ -89,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem(TOKEN_KEY);
         setToken("");
         setUser(null);
-        setAuthError(caught instanceof Error ? caught.message : "로그인이 만료되었습니다.");
+        setAuthError(null);
       })
       .finally(() => {
         if (alive) setInitialized(true);

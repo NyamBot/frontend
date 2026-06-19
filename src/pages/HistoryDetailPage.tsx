@@ -39,7 +39,7 @@ export function HistoryDetailPage() {
         setError(null);
       })
       .catch((caught) => {
-        setError(caught instanceof Error ? caught.message : "대화 기록을 불러오지 못했습니다.");
+        setError("대화 기록을 불러오지 못했습니다.");
       });
   }, [session, token, sessionId]);
 
@@ -51,7 +51,7 @@ export function HistoryDetailPage() {
       await deleteTasteAgentSession(session.id, token);
       navigate("/history");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "대화 기록 삭제에 실패했습니다.");
+      setError("대화 기록 삭제에 실패했습니다.");
       setDeleting(false);
       setConfirmOpen(false);
     }
@@ -195,7 +195,7 @@ function HistoryBubble({ message }: { message: TasteAgentMessage }) {
           <div
             className={cn(
               "whitespace-pre-wrap break-words rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed",
-              isUser ? "bg-brand-300 text-leaf-600" : "bg-zinc-100 text-zinc-800",
+              isUser ? "bg-brand-300 text-leaf-600" : "bg-leaf-50 text-leaf-600",
             )}
           >
             {message.content}

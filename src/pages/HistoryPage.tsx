@@ -31,7 +31,7 @@ export function HistoryPage() {
       setHasMore(data.has_more);
       setError(null);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "기록을 불러오지 못했습니다.");
+      setError("기록을 불러오지 못했습니다.");
     } finally {
       setLoading(false);
     }
