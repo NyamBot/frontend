@@ -499,7 +499,7 @@ function Bubble({
                 ? "bg-brand-300 text-leaf-600"
                 : muted
                   ? "animate-pulse bg-zinc-50 text-zinc-400"
-                  : "bg-zinc-100 text-zinc-800",
+                  : "bg-leaf-50 text-leaf-600",
             )}
           >
             {children}
