@@ -45,17 +45,17 @@ export function Card({
 }
 
 type FieldProps = {
-  label: string;
+  label: ReactNode;
   children: ReactNode;
   className?: string;
 };
 
 export function Field({ label, children, className }: FieldProps) {
   return (
-    <label className={cn("block space-y-1.5", className)}>
-      <span className="text-xs font-medium text-zinc-500">{label}</span>
+    <div className={cn("block space-y-1.5", className)}>
+      <div className="text-xs font-medium text-zinc-500">{label}</div>
       {children}
-    </label>
+    </div>
   );
 }
 

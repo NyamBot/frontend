@@ -23,7 +23,7 @@ export function LoginPage() {
         <h1 className="mt-3 text-lg font-semibold leading-snug text-zinc-800">
           오늘 어디 갈지 고민될 때,
           <br />
-          <em className="not-italic text-brand-500">내 맛집 메모</em>가 답을 알아요.
+          <em className="not-italic text-brand-500">내 맛집 리뷰</em>가 답을 알아요.
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-zinc-500">
           맛집을 기록해두면

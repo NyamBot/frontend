@@ -130,7 +130,7 @@ export function MyPage() {
           <section className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-4 shadow-xl">
             <h2 className="text-sm font-semibold text-zinc-900">회원탈퇴할까요?</h2>
             <p className="mt-2 text-sm leading-relaxed text-zinc-500">
-              계정, 저장한 맛집, 맛집 메모, 대화 기록이 모두 삭제됩니다.
+              계정, 저장한 맛집, 맛집 리뷰, 대화 기록이 모두 삭제됩니다.
             </p>
             <div className="mt-4 flex gap-2">
               <button

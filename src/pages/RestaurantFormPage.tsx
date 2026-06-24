@@ -16,6 +16,8 @@ import { cn, extractArea, extractCuisine } from "../lib/utils";
 
 const PRICE_OPTIONS = ["1만원 이하", "1~2만원", "2~3만원", "3~5만원", "5만원 이상"];
 const CUISINE_OPTIONS = ["한식", "일식", "중식", "양식", "분식", "카페", "술집", "기타"];
+const REQUIRED_TAG_COUNT = 3;
+const MIN_REVIEW_LENGTH = 10;
 
 export function RestaurantFormPage() {
   const { token } = useAuth();
@@ -110,11 +112,6 @@ export function RestaurantFormPage() {
     setRegionDistrict(region.district);
     setArea(region.area || extractArea(place.address_name || place.road_address_name));
     setCuisine(normalizeCuisine(place.category_name));
-    setNote((current) =>
-      current.trim()
-        ? current
-        : `${place.place_name}에 다녀온 느낌, 분위기, 맛, 재방문 의사를 적어주세요.`,
-    );
   }
 
   function startManualEntry() {
@@ -173,6 +170,14 @@ export function RestaurantFormPage() {
 
   async function handleSave() {
     if (!token) return;
+    if (moodTags.length < REQUIRED_TAG_COUNT) {
+      setError(`태그는 ${REQUIRED_TAG_COUNT}개 이상 입력해 주세요.`);
+      return;
+    }
+    if (!editing && note.trim().length < MIN_REVIEW_LENGTH) {
+      setError(`리뷰는 ${MIN_REVIEW_LENGTH}자 이상 입력해 주세요.`);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -246,8 +251,12 @@ export function RestaurantFormPage() {
   }
 
   const canSave = editing
-    ? name.trim() && area.trim() && cuisine.trim()
-    : name.trim() && area.trim() && cuisine.trim() && note.trim();
+    ? name.trim() && area.trim() && cuisine.trim() && moodTags.length >= REQUIRED_TAG_COUNT
+    : name.trim() &&
+      area.trim() &&
+      cuisine.trim() &&
+      moodTags.length >= REQUIRED_TAG_COUNT &&
+      note.trim().length >= MIN_REVIEW_LENGTH;
 
   return (
     <div className="tf-scroll h-full overflow-y-auto">
@@ -268,8 +277,8 @@ export function RestaurantFormPage() {
             </h2>
             <p className="text-[11px] text-zinc-400">
               {editing
-                ? "식당명, 지역, 음식 종류, 가격대, 분위기 태그를 수정해요."
-                : "장소를 선택하거나 직접 입력한 뒤 가격대, 태그, 기록을 채워요."}
+                ? "식당명, 지역, 음식 종류, 가격대, 태그를 수정해요."
+                : "장소를 선택하거나 직접 입력한 뒤 가격대, 태그, 리뷰를 채워요."}
             </p>
           </div>
         </div>
@@ -386,7 +395,14 @@ export function RestaurantFormPage() {
           </ChipRow>
         </Field>
 
-        <Field label="분위기 태그">
+        <Field
+          label={
+            <RequiredFieldLabel
+              label="태그"
+              message={`필수로 취향을 잘 담을 수 있게 태그를 ${REQUIRED_TAG_COUNT}개 이상 골라주세요.`}
+            />
+          }
+        >
           <div className="flex items-center gap-2">
             <TextInput
               value={tagInput}
@@ -427,7 +443,14 @@ export function RestaurantFormPage() {
         </Field>
 
         {!editing && (
-          <Field label="저장 기록">
+          <Field
+            label={
+              <RequiredFieldLabel
+                label="리뷰"
+                message={`필수로 추천 근거가 될 리뷰를 ${MIN_REVIEW_LENGTH}자 이상 입력해 주세요.`}
+              />
+            }
+          >
             <TextArea
               rows={5}
               value={note}
@@ -448,6 +471,37 @@ export function RestaurantFormPage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+function RequiredFieldLabel({ label, message }: { label: string; message: string }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <span className="relative inline-flex items-center gap-1.5">
+      <span>{label}</span>
+      <button
+        type="button"
+        className="inline-flex text-sm font-bold leading-none text-rose-500 transition hover:text-rose-600"
+        aria-label={`${label} 필수 입력 안내`}
+        onClick={(event) => {
+          event.preventDefault();
+          setOpen((current) => !current);
+        }}
+        onBlur={() => setOpen(false)}
+      >
+        *
+      </button>
+      {open && (
+        <span
+          role="tooltip"
+          className="absolute left-0 top-full z-20 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-rose-100 bg-white px-3 py-2 text-[11px] font-normal leading-relaxed text-zinc-600 shadow-lg"
+        >
+          <span className="absolute -top-1 left-3 h-2 w-2 rotate-45 border-l border-t border-rose-100 bg-white" />
+          {message}
+        </span>
+      )}
+    </span>
   );
 }
 
